@@ -9,6 +9,7 @@
 //! - Ed25519 身份/Verifier 密钥：[`crypto`]
 //! - 面包屑与哈希链：[`breadcrumb`]、[`chain`]
 //! - Epoch 与 Merkle 检查点：[`epoch`]
+//! - Active Verification 实时挑战/响应（§12）：[`liveness`]
 //! - Proof-of-Humanity 证书：[`poh`]
 //!
 //! 空间量化（GPS→H3）、context digest 采集、网络传输与链上锚定属于
@@ -28,6 +29,7 @@ pub mod crypto;
 pub mod engine;
 pub mod epoch;
 pub mod error;
+pub mod liveness;
 pub mod poh;
 
 pub use breadcrumb::{Breadcrumb, MetaFlags};
@@ -35,4 +37,5 @@ pub use chain::ChainRules;
 pub use crypto::ProtocolKey;
 pub use epoch::Epoch;
 pub use error::{Result, TripError};
+pub use liveness::{LivenessChallenge, LivenessResponse};
 pub use poh::PohCertificate;

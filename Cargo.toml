@@ -8,6 +8,7 @@ members = [
     "gyid-gui",
     "trip-core",
     "trip-cli",
+    "trip-server",
 ]
 
 [workspace.package]

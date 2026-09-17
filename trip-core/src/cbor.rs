@@ -193,6 +193,89 @@ pub fn parse(input: &[u8]) -> Result<(Value, &[u8])> {
     Ok((v, rest))
 }
 
+/// 切出第一个完整 CBOR 值的原始字节与剩余字节（不解释内容）。
+///
+/// 用于自分隔的 CBOR 帧流（例如 `POST /v1/evidence` 请求体是多条面包屑
+/// 完整 CBOR map 的顺序拼接）：调用方可反复 `split_value` 取得每条的字节
+/// 切片，再交给对应类型的 `from_cbor` 做规范化解析与验签。
+///
+/// 只支持本协议使用的确定性编码子集；遇到负整数、文本串、标签、
+/// indefinite-length 或保留附加信息一律报错。
+pub fn split_value(input: &[u8]) -> Result<(&[u8], &[u8])> {
+    let len = value_len(input)?;
+    if input.len() < len {
+        return Err(TripError::Cbor(
+            "unexpected end while skipping cbor value".into(),
+        ));
+    }
+    Ok((&input[..len], &input[len..]))
+}
+
+/// 返回从 `input` 起始的一个完整 CBOR 值所占字节数（递归计入容器内容）。
+fn value_len(input: &[u8]) -> Result<usize> {
+    let (&first, rest) = input
+        .split_first()
+        .ok_or_else(|| TripError::Cbor("unexpected end of cbor input".into()))?;
+    let major = first >> 5;
+    let ai = first & 0x1f;
+
+    // 头部（首字节 + 参数字节）长度。
+    let arg_bytes = match ai {
+        0..=23 => 0,
+        24 => 1,
+        25 => 2,
+        26 => 4,
+        27 => 8,
+        _ => {
+            return Err(TripError::Cbor(
+                "indefinite/reserved cbor head not permitted".into(),
+            ))
+        }
+    };
+    if rest.len() < arg_bytes {
+        return Err(TripError::Cbor(
+            "unexpected end while reading cbor head argument".into(),
+        ));
+    }
+    let head_len = 1 + arg_bytes;
+
+    match major {
+        // major 0 uint：仅头部。
+        0 => Ok(head_len),
+        // major 2 bstr：头部 + payload。
+        2 => {
+            let (payload_len, _) = read_arg(ai, rest)?;
+            Ok(head_len + payload_len as usize)
+        }
+        // major 4 array：n 个值；major 5 map：2n 个值。
+        4 | 5 => {
+            let (count, _) = read_arg(ai, rest)?;
+            let items = if major == 4 { count } else { count * 2 };
+            let mut offset = head_len;
+            for _ in 0..items {
+                let sub = input.get(offset..).ok_or_else(|| {
+                    TripError::Cbor("cbor container shorter than declared".into())
+                })?;
+                offset += value_len(sub)?;
+            }
+            Ok(offset)
+        }
+        // major 7 simple/float：20..=23 单字节，26=float32，27=float64。
+        7 => match ai {
+            20..=23 => Ok(1),
+            26 => Ok(5),
+            27 => Ok(9),
+            _ => Err(TripError::Cbor(
+                "unsupported simple value in deterministic encoding".into(),
+            )),
+        },
+        1 | 3 | 6 => Err(TripError::Cbor(
+            "negative int/text/tag not used by TRIP".into(),
+        )),
+        _ => unreachable!("major is 3 bits, 0..=7"),
+    }
+}
+
 /// 解析整个输入，拒绝尾部多余字节。
 pub fn parse_all(input: &[u8]) -> Result<Value> {
     let (v, rest) = parse_one(input)?;
@@ -339,4 +422,51 @@ fn split_len<'a>(rest: &'a [u8], len: usize, what: &str) -> Result<(&'a [u8], &'
         )));
     }
     Ok((&rest[..len], &rest[len..]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_stream_of_scalars_and_containers() {
+        // uint(5) + bstr(3 字节) + array[uint(1), uint(2)] + map{3: true}
+        let mut stream = Vec::new();
+        stream.extend_from_slice(Writer::new().uint(5).as_bytes());
+        stream.extend_from_slice(Writer::new().bstr(&[1, 2, 3]).as_bytes());
+        {
+            let mut w = Writer::new();
+            w.array(2).uint(1).uint(2);
+            stream.extend_from_slice(w.as_bytes());
+        }
+        {
+            let mut w = Writer::new();
+            w.map(1).uint(3).bool(true);
+            stream.extend_from_slice(w.as_bytes());
+        }
+
+        let (v1, rest) = split_value(&stream).unwrap();
+        assert_eq!(v1, &[5]);
+        let (v2, rest) = split_value(rest).unwrap();
+        assert_eq!(v2, &[0x43, 1, 2, 3]);
+        let (v3, rest) = split_value(rest).unwrap();
+        assert_eq!(v3, &[0x82, 1, 2]);
+        let (v4, rest) = split_value(rest).unwrap();
+        assert_eq!(v4, &[0xA1, 3, 0xF5]);
+        assert!(rest.is_empty());
+
+        // 每个切出的字节都能被完整解析。
+        assert!(parse_all(v1).is_ok());
+        assert!(parse_all(v2).is_ok());
+        assert!(parse_all(v3).is_ok());
+        assert!(parse_all(v4).is_ok());
+    }
+
+    #[test]
+    fn split_truncated_input_errors() {
+        // 声明 3 字节 bstr 但只给 1 字节。
+        assert!(split_value(&[0x43, 0xAA]).is_err());
+        // 空输入。
+        assert!(split_value(&[]).is_err());
+    }
 }
