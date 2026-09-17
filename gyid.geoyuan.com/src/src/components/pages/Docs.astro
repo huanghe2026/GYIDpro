@@ -1,0 +1,55 @@
+---
+import { pages } from '../../i18n/content';
+import CodeBlock from '../CodeBlock.astro';
+interface Props {
+  locale: 'en' | 'zh';
+}
+const { locale } = Astro.props;
+const t = pages[locale].docs;
+---
+
+<!-- HERO -->
+<section class="py-24 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto text-center fade-in-up">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.hero.badge}</div>
+    <h1 class="font-orbitron font-black text-4xl md:text-5xl text-cyber-text">{t.hero.title}</h1>
+    <p class="section-subtitle mx-auto text-center mt-4">{t.hero.subtitle}</p>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<section class="py-12 px-4 sm:px-6">
+  <div class="max-w-3xl mx-auto">
+    <div class="cyber-card cyber-corner p-8">
+      <h2 class="font-orbitron font-bold text-xl text-cyber-text mb-2">{t.quickstart.title}</h2>
+      <p class="text-cyber-text-dim mb-4">{t.quickstart.desc}</p>
+      <CodeBlock lines={t.quickstart.code} />
+      <a href={t.quickstart.btn.href} class="btn-cyber mt-5 inline-flex">{t.quickstart.btn.label}</a>
+    </div>
+  </div>
+</section>
+
+<!-- SECTIONS -->
+<section class="py-12 px-4 sm:px-6" style="background: rgba(0,0,0,0.25);">
+  <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {
+      t.sections.map((s) => (
+        <div class="cyber-card cyber-corner p-6">
+          <div class="font-orbitron font-black text-3xl neon-magenta mb-3">{s.n}</div>
+          <h3 class="font-orbitron font-bold text-cyber-text mb-2">{s.title}</h3>
+          <p class="text-cyber-text-dim text-sm leading-relaxed mb-4">{s.desc}</p>
+          <a href={s.href} class="text-cyber-cyan text-sm font-mono hover:underline">{s.cta}</a>
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<!-- WIP -->
+<section class="py-16 px-4 sm:px-6">
+  <div class="max-w-3xl mx-auto text-center">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.wip.badge}</div>
+    <p class="text-cyber-text-dim mb-6">{t.wip.desc}</p>
+    <a href={t.wip.btn.href} target="_blank" rel="noopener" class="btn-cyber-outline inline-flex">{t.wip.btn.label}</a>
+  </div>
+</section>

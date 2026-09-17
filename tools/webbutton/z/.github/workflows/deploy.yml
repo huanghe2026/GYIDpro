@@ -1,0 +1,42 @@
+# GYID WebButton CI/CD 配置示例
+# 适用于 GitHub Actions / GitLab CI / Jenkins
+
+name: Deploy GYID WebButton
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/webbutton/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /var/www/geoyuan.com/tools/webbutton
+            rm -rf z.backup && mv z z.backup || true
+            mkdir -p z
+            # 使用 rsync 或 scp 同步文件
+            rsync -avz --delete ./ z/
+
+      - name: Purge CDN Cache
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CF_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"files":["https://geoyuan.com/tools/webbutton/z/index.html"]}'
+
+      - name: Verify Deployment
+        run: |
+          sleep 5
+          curl -sf "https://geoyuan.com/tools/webbutton/z/index.html" && echo "✅ 部署验证成功" || exit 1

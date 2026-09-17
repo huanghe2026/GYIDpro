@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Download from '../components/pages/Download.astro';
+import { pages } from '../i18n/content';
+const locale = 'en';
+---
+<Layout locale={locale} path="/download" title="Download GyID — Geoyuan" description={pages.en.download.hero.subtitle}>
+  <Download locale={locale} />
+</Layout>

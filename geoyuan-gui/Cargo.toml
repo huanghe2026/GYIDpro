@@ -1,0 +1,90 @@
+[package]
+name = "geoyuan-gui"
+version = "0.1.0"
+edition = "2021"
+authors = ["GeoYuan Team"]
+description = "GeoYuan Windows GUI - Game-style login interface"
+
+[[bin]]
+name = "geoyuan-gui"
+path = "src/main.rs"
+
+[dependencies]
+# Slint UI framework
+slint = "1.8"
+
+# Core library
+geoyuan-core = { path = "../geoyuan-core", features = ["native"] }
+
+# Async runtime
+tokio = { version = "1.36", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Image processing for avatar preview and QR code (unified with workspace image 0.25)
+image = { workspace = true }
+
+# QR Code decoding (supports image 0.25)
+rqrr = "0.7"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# File dialog
+rfd = "0.14"
+
+# Logging
+env_logger = "0.11"
+log = "0.4"
+
+# Directories
+dirs = "5.0"
+
+# EXIF parsing
+kamadak-exif = "0.5"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hashing
+blake3 = "1.5"
+sha2 = "0.10"
+sha1 = "0.10"
+hmac = "0.12"
+md-5 = "0.10"
+hex = "0.4"
+
+# Base58 encoding
+base58 = "0.2"
+
+# URL encoding
+urlencoding = "2.1"
+
+# Error handling
+thiserror = "1.0"
+
+# Async trait
+async-trait = "0.1"
+
+# Clipboard
+arboard = "3.4"
+
+# Window
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_Shell",
+    "Win32_Graphics_Gdi"
+]}
+
+[build-dependencies]
+slint-build = "1.8"
+
+[features]
+default = []
+
+[lib]
+name = "geoyuan_gui"
+crate-type = ["lib"]

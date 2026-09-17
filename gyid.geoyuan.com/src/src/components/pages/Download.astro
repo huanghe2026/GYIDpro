@@ -1,0 +1,118 @@
+---
+import { pages } from '../../i18n/content';
+import CodeBlock from '../CodeBlock.astro';
+interface Props {
+  locale: 'en' | 'zh';
+}
+const { locale } = Astro.props;
+const t = pages[locale].download;
+---
+
+<!-- HERO -->
+<section class="py-24 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto text-center fade-in-up">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.hero.badge}</div>
+    <h1 class="font-orbitron font-black text-4xl md:text-5xl text-cyber-text">{t.hero.title}</h1>
+    <p class="section-subtitle mx-auto text-center mt-4">{t.hero.subtitle}</p>
+  </div>
+</section>
+
+<!-- GUI -->
+<section class="py-16 px-4 sm:px-6">
+  <div class="max-w-7xl mx-auto">
+    <h2 class="section-title font-orbitron mb-2">{t.gui.title}</h2>
+    <p class="text-cyber-text-dim mb-8 max-w-2xl">{t.gui.desc}</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {
+        t.gui.platforms.map((p) => (
+          <div class="cyber-card cyber-corner p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <span class="text-3xl">{p.icon}</span>
+                <div>
+                  <div class="font-orbitron font-bold text-cyber-text">{p.name}</div>
+                  <div class="font-mono text-xs text-cyber-text-dim">{p.version}</div>
+                </div>
+              </div>
+              {p.comingSoon && <span class="cyber-badge text-[10px]">Soon</span>}
+            </div>
+
+            <ul class="space-y-2 mb-5">
+              {p.downloads.map((d) => (
+                <li>
+                  <a href={d.href} class="flex items-center justify-between border border-cyber-border px-3 py-2 text-sm text-cyber-text-dim hover:text-cyber-cyan hover:border-cyber-cyan transition-colors">
+                    <span>{d.label}</span><span class="text-cyber-cyan">↓</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+
+            <div class="mt-auto">
+              <div class="font-mono text-xs text-cyber-cyan uppercase tracking-widest mb-2">{p.guideTitle}</div>
+              {p.guide.some((l) => l.startsWith('#')) ? (
+                <CodeBlock lines={p.guide} />
+              ) : (
+                <ol class="list-decimal list-inside text-sm text-cyber-text-dim space-y-1">
+                  {p.guide.map((g) => <li>{g}</li>)}
+                </ol>
+              )}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+    <p class="font-mono text-sm text-cyber-yellow mt-6">{t.gui.note}</p>
+  </div>
+</section>
+
+<!-- CLI -->
+<section class="py-16 px-4 sm:px-6" style="background: rgba(0,0,0,0.25);">
+  <div class="max-w-5xl mx-auto">
+    <h2 class="section-title font-orbitron mb-2">{t.cli.title}</h2>
+    <p class="text-cyber-text-dim mb-8 max-w-2xl">{t.cli.desc}</p>
+
+    <div class="space-y-8">
+      <div class="cyber-card p-6">
+        <div class="font-orbitron font-bold text-cyber-cyan mb-3">{t.cli.cargoTitle}</div>
+        <CodeBlock lines={t.cli.cargo} />
+      </div>
+      <div class="cyber-card p-6">
+        <div class="font-orbitron font-bold text-cyber-cyan mb-3">{t.cli.usageTitle}</div>
+        <CodeBlock lines={t.cli.usage} />
+      </div>
+      <div class="cyber-card p-6">
+        <div class="font-orbitron font-bold text-cyber-cyan mb-3">{t.cli.buildTitle}</div>
+        <CodeBlock lines={t.cli.build} />
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SDK -->
+<section class="py-16 px-4 sm:px-6">
+  <div class="max-w-7xl mx-auto">
+    <h2 class="section-title font-orbitron mb-2">{t.sdk.title}</h2>
+    <p class="text-cyber-text-dim mb-8 max-w-2xl">{t.sdk.desc}</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+      {
+        t.sdk.items.map((it) => (
+          <div class="cyber-card cyber-corner p-6">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="text-2xl">{it.icon}</span>
+              <span class="font-orbitron font-bold text-cyber-text">{it.name}</span>
+              {it.comingSoon && <span class="cyber-badge text-[10px] ml-auto">Soon</span>}
+            </div>
+            <div class="font-mono text-xs text-cyber-text-dim mb-2">{it.file}</div>
+            <CodeBlock lines={[it.code]} />
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="cyber-card p-6">
+      <div class="font-orbitron font-bold text-cyber-cyan mb-3">{t.sdk.quickTitle}</div>
+      <CodeBlock lines={t.sdk.quickCode.split('\n')} />
+    </div>
+  </div>
+</section>

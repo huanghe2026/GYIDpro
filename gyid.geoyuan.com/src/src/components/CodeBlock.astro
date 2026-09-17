@@ -1,0 +1,25 @@
+---
+interface Props {
+  lines: string[];
+  caption?: string;
+}
+const { lines, caption } = Astro.props;
+function esc(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function classify(line: string): string {
+  const e = esc(line);
+  if (line.startsWith('$')) return e.replace(/^\$\s?/, '<span class="prompt">$</span> ');
+  if (line.startsWith('#')) return `<span class="cmt">${e}</span>`;
+  if (line.startsWith('✓') || line.startsWith('→')) return `<span class="prompt">${e}</span>`;
+  return e;
+}
+const html = lines.map(classify).join('\n');
+---
+
+{
+  caption && (
+    <div class="font-mono text-xs text-cyber-text-dim mb-2 uppercase tracking-widest">{caption}</div>
+  )
+}
+<pre class="code-block"><code set:html={html + '\n'}></code></pre>

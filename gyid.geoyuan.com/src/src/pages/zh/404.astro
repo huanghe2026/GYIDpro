@@ -1,0 +1,8 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import NotFound from '../../components/pages/NotFound.astro';
+const locale = 'zh';
+---
+<Layout locale={locale} path="/zh/404" title="404 — 页面未找到 | 地理元" description="这个位置不在我们的地图上">
+  <NotFound locale={locale} />
+</Layout>

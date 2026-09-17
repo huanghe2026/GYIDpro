@@ -1,0 +1,61 @@
+[package]
+name = "gyid-gui"
+version = "0.1.0"
+edition = "2021"
+description = "GyID Desktop GUI - Slint-based native interface"
+
+[[bin]]
+name = "gyid-gui"
+path = "src/main.rs"
+
+[build-dependencies]
+slint-build = "1.8"
+
+[dependencies]
+# Slint GUI 框架
+slint = "1.8"
+
+# 核心功能
+gyid-core = { path = "../gyid-core" }
+gyid-sdk = { path = "../gyid-sdk" }
+
+# 序列化
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# 异步运行时
+tokio = { workspace = true }
+
+# 时间
+chrono = { workspace = true }
+
+# 日志
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# 错误处理
+anyhow = { workspace = true }
+
+# 目录
+dirs = { workspace = true }
+
+# 图片处理
+image = { version = "0.25", features = ["png", "jpeg", "ico"] }
+
+# 剪贴板
+arboard = "1.2"
+
+# QR 码
+qrcode = "0.12"
+base64 = "0.22"
+
+# BLAKE3
+blake3 = { workspace = true }
+
+# 文件对话框
+rfd = "0.15"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_UI_WindowsAndMessaging",
+] }

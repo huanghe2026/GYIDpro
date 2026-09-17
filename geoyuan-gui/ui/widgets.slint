@@ -1,0 +1,895 @@
+// Theme + 通用组件 (模块文件)
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+// ═══════════════════════════════════════════════════════════════
+// 全局配色
+// ═══════════════════════════════════════════════════════════════
+export global Theme {
+    out property <color> cyber-blue: #00D9FF;
+    out property <color> cyber-magenta: #FF00FF;
+    out property <color> cyber-yellow: #FFE500;
+    out property <color> neon-green: #00FF88;
+    out property <color> deep-black: #0A0E17;
+    out property <color> card-bg: #141B2D;
+    out property <color> card-border: #2D3748;
+    out property <color> text-primary: #FFFFFF;
+    out property <color> text-secondary: #8892B0;
+    out property <color> input-bg: #1A2332;
+    out property <color> danger: #FF4444;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 赛博实心按钮
+// ═══════════════════════════════════════════════════════════════
+export component CyberButton {
+    in property <string> label: "按钮";
+    callback clicked();
+    width: 200px;
+    height: 48px;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+
+        Rectangle {
+            background: Theme.cyber-blue;
+            border-radius: 8px;
+
+            Text {
+                text: root.label;
+                font-size: 16px;
+                font-weight: 700;
+                color: Theme.deep-black;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 赛博描边按钮
+// ═══════════════════════════════════════════════════════════════
+export component CyberButtonOutline {
+    in property <string> label: "按钮";
+    callback clicked();
+    width: 140px;
+    height: 40px;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+
+        Rectangle {
+            background: transparent;
+            border-width: 1px;
+            border-color: Theme.cyber-blue;
+            border-radius: 8px;
+
+            Text {
+                text: root.label;
+                font-size: 13px;
+                color: Theme.cyber-blue;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 步骤项 (登录页步骤说明)
+// ═══════════════════════════════════════════════════════════════
+export component StepItem {
+    in property <string> num: "01";
+    in property <string> label: "";
+    in property <string> desc: "";
+
+    height: 36px;
+
+    HorizontalLayout {
+        spacing: 16px;
+
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            background: Theme.cyber-blue;
+            border-radius: 8px;
+
+            Text {
+                text: root.num;
+                font-size: 13px;
+                font-weight: 700;
+                color: Theme.deep-black;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        VerticalBox {
+            spacing: 2px;
+
+            Text {
+                text: root.label;
+                font-size: 14px;
+                font-weight: 600;
+                color: Theme.text-primary;
+            }
+
+            Text {
+                text: root.desc;
+                font-size: 12px;
+                color: Theme.text-secondary;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 照片拖放区
+// ═══════════════════════════════════════════════════════════════
+export component PhotoDropZone {
+    in property <string> photo_path: "";
+    callback on_pick();
+    width: 380px;
+    height: 380px;
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => { root.on_pick(); }
+
+        Rectangle {
+            background: Theme.card-bg;
+            border-radius: 16px;
+            border-width: 2px;
+            border-color: Theme.card-border;
+
+            VerticalBox {
+                alignment: center;
+                spacing: 16px;
+                padding: 16px;
+
+                if root.photo_path == "":
+                    Rectangle {
+                        width: 80px;
+                        height: 80px;
+                        background: Theme.card-border;
+                        border-radius: 40px;
+
+                        Text {
+                            text: "📷";
+                            font-size: 32px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                if root.photo_path == "":
+                    Text {
+                        text: "拖放照片到此处\n或点击选择文件";
+                        font-size: 16px;
+                        color: Theme.text-secondary;
+                        horizontal-alignment: center;
+                    }
+
+                if root.photo_path != "":
+                    Text {
+                        text: "✅ 已选择照片";
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: Theme.neon-green;
+                        horizontal-alignment: center;
+                    }
+
+                if root.photo_path != "":
+                    Text {
+                        text: root.photo_path;
+                        font-size: 11px;
+                        color: Theme.text-secondary;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 进度步骤
+// ═══════════════════════════════════════════════════════════════
+export component ProgressStep {
+    in property <string> step_title: "";
+    in property <string> step_status: "";
+    in property <bool> done: false;
+
+    HorizontalLayout {
+        spacing: 16px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+
+        Rectangle {
+            width: 12px;
+            height: 12px;
+            background: root.done ? Theme.neon-green : Theme.text-secondary;
+            border-radius: 6px;
+        }
+
+        Text {
+            text: root.step_title;
+            font-size: 15px;
+            color: Theme.text-primary;
+            vertical-alignment: center;
+            width: 200px;
+        }
+
+        Text {
+            text: root.step_status;
+            font-size: 13px;
+            color: root.done ? Theme.neon-green : Theme.cyber-yellow;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 导航项
+// ═══════════════════════════════════════════════════════════════
+export component NavItem {
+    in property <string> nav_icon: "";
+    in property <string> nav_label: "";
+    callback on_clicked();
+    height: 44px;
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => { root.on_clicked(); }
+
+        Rectangle {
+            background: transparent;
+            border-radius: 8px;
+
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 12px;
+
+                Text {
+                    text: root.nav_icon;
+                    font-size: 16px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.nav_label;
+                    font-size: 14px;
+                    color: Theme.text-secondary;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 交易项
+// ═══════════════════════════════════════════════════════════════
+export component TransactionItem inherits Rectangle {
+    in property <string> tx_icon: "";
+    in property <string> tx_title: "";
+    in property <string> tx_amount: "";
+    in property <string> tx_status: "";
+    in property <string> tx_time: "";
+
+    background: Theme.input-bg;
+    border-radius: 8px;
+    height: 64px;
+
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 16px;
+
+        Rectangle {
+            width: 40px;
+            height: 40px;
+            background: Theme.card-border;
+            border-radius: 20px;
+
+            Text {
+                text: root.tx_icon;
+                font-size: 16px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        VerticalBox {
+            spacing: 4px;
+
+            Text {
+                text: root.tx_title;
+                font-size: 14px;
+                color: Theme.text-primary;
+            }
+
+            Text {
+                text: root.tx_time;
+                font-size: 12px;
+                color: Theme.text-secondary;
+            }
+        }
+
+        VerticalBox {
+            spacing: 4px;
+
+            Text {
+                text: root.tx_amount;
+                font-size: 14px;
+                font-weight: 700;
+                color: Theme.neon-green;
+                horizontal-alignment: right;
+            }
+
+            Text {
+                text: root.tx_status;
+                font-size: 10px;
+                color: Theme.neon-green;
+                horizontal-alignment: right;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 能量条
+// ═══════════════════════════════════════════════════════════════
+export component EnergyBar {
+    in property <float> current: 50.0;
+    in property <float> max: 100.0;
+    
+    height: 24px;
+
+    VerticalLayout {
+        spacing: 4px;
+
+        HorizontalLayout {
+            Text {
+                text: "⚡ 能量";
+                font-size: 12px;
+                font-weight: 600;
+                color: Theme.cyber-yellow;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            Text {
+                text: root.current + "/" + root.max;
+                font-size: 12px;
+                color: Theme.text-primary;
+            }
+        }
+
+        Rectangle {
+            height: 8px;
+            background: Theme.input-bg;
+            border-radius: 4px;
+
+            Rectangle {
+                width: parent.width * (root.current / root.max);
+                height: 8px;
+                background: Theme.cyber-yellow;
+                border-radius: 4px;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 成就徽章
+// ═══════════════════════════════════════════════════════════════
+export component AchievementBadge {
+    in property <string> icon: "🏆";
+    in property <string> name: "成就";
+    in property <string> desc: "描述";
+    in property <float> progress: 0.0;
+    in property <bool> unlocked: false;
+    in property <string> unlocked_at: "";
+
+    Rectangle {
+        background: Theme.input-bg;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: unlocked ? Theme.cyber-yellow : Theme.card-border;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+
+            // 顶部：图标 + 名称
+            HorizontalLayout {
+                spacing: 12px;
+
+                Rectangle {
+                    width: 48px;
+                    height: 48px;
+                    background: unlocked ? Theme.cyber-yellow : Theme.card-border;
+                    border-radius: 12px;
+
+                    Text {
+                        text: root.icon;
+                        font-size: 24px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                VerticalBox {
+                    spacing: 4px;
+
+                    Text {
+                        text: root.name;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: unlocked ? Theme.cyber-yellow : Theme.text-primary;
+                    }
+
+                    Text {
+                        text: root.desc;
+                        font-size: 11px;
+                        color: Theme.text-secondary;
+                    }
+                }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            if unlocked:
+                Text {
+                    text: "✓";
+                    font-size: 20px;
+                    color: Theme.neon-green;
+                    vertical-alignment: center;
+                }
+        }
+
+        // 进度条
+        if !unlocked:
+            VerticalLayout {
+                spacing: 4px;
+
+                Rectangle {
+                    height: 4px;
+                    background: Theme.card-border;
+                    border-radius: 2px;
+
+                    Rectangle {
+                        width: parent.width * root.progress;
+                        height: 4px;
+                        background: Theme.cyber-yellow;
+                        border-radius: 2px;
+                    }
+                }
+
+                Text {
+                    text: root.progress + "%";
+                    font-size: 10px;
+                    color: Theme.text-secondary;
+                    horizontal-alignment: right;
+                }
+            }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 任务项
+// ═══════════════════════════════════════════════════════════════
+export component TaskItem {
+    in property <string> icon: "📋";
+    in property <string> name: "任务";
+    in property <string> desc: "描述";
+    in property <float> reward: 5.0;
+    in property <bool> completed: false;
+    in property <float> progress: 0.0;
+
+    Rectangle {
+        background: Theme.input-bg;
+        border-radius: 10px;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 12px;
+
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    background: completed ? Theme.neon-green : Theme.card-border;
+                    border-radius: 10px;
+
+                    Text {
+                        text: completed ? "✓" : root.icon;
+                        font-size: completed ? 20px : 18px;
+                        color: completed ? Theme.deep-black : Theme.text-secondary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                VerticalBox {
+                    spacing: 2px;
+
+                    Text {
+                        text: root.name;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: completed ? Theme.neon-green : Theme.text-primary;
+                    }
+
+                    Text {
+                        text: root.desc;
+                        font-size: 11px;
+                        color: Theme.text-secondary;
+                    }
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                // 奖励
+                VerticalLayout {
+                    spacing: 2px;
+
+                    Text {
+                        text: "+" + root.reward;
+                        font-size: 14px;
+                        font-weight: 700;
+                        color: Theme.cyber-yellow;
+                        horizontal-alignment: right;
+                    }
+
+                    Text {
+                        text: "⚡";
+                        font-size: 12px;
+                        color: Theme.cyber-yellow;
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+        }
+
+        // 进度条
+        if !completed && root.progress > 0.0:
+            Rectangle {
+                height: 3px;
+                background: Theme.card-border;
+                border-radius: 2px;
+
+                Rectangle {
+                    width: parent.width * root.progress;
+                    height: 3px;
+                    background: Theme.cyber-blue;
+                    border-radius: 2px;
+                }
+            }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 排名项
+// ═══════════════════════════════════════════════════════════════
+export component RankItem {
+    in property <int> rank: 1;
+    in property <string> name: "用户";
+    in property <string> gyid_count: "0";
+    in property <bool> is_self: false;
+
+    Rectangle {
+        background: is_self ? #00D9FF33 : Theme.input-bg;
+        border-radius: 8px;
+        border-width: is_self ? 1px : 0px;
+        border-color: Theme.cyber-blue;
+        padding: 10px;
+
+        HorizontalLayout {
+            spacing: 12px;
+
+            // 排名
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                background: rank <= 3 ? Theme.cyber-yellow : Theme.card-border;
+                border-radius: 8px;
+
+                Text {
+                    text: root.rank;
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: rank <= 3 ? Theme.deep-black : Theme.text-secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Text {
+                text: root.name;
+                font-size: 14px;
+                color: is_self ? Theme.cyber-blue : Theme.text-primary;
+                font-weight: is_self ? 700 : 400;
+                vertical-alignment: center;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            Text {
+                text: root.gyid_count + " GyID";
+                font-size: 13px;
+                color: Theme.text-secondary;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 地图标记点
+// ═══════════════════════════════════════════════════════════════
+export component MapMarker {
+    in property <string> city: "城市";
+    in property <string> country: "国家";
+    in property <int> count: 0;
+    in property <float> lat: 0.0;  // 纬度
+    in property <float> lon: 0.0;  // 经度
+    in property <bool> is_active: false;
+    callback on_click();
+
+    Rectangle {
+        background: is_active ? Theme.cyber-blue : Theme.card-bg;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: is_active ? Theme.cyber-blue : Theme.card-border;
+
+        TouchArea {
+            clicked => { root.on_click(); }
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 6px;
+
+                // 城市名称
+                Text {
+                    text: root.city;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: is_active ? Theme.deep-black : Theme.text-primary;
+                    horizontal-alignment: center;
+                }
+
+                // 国家
+                Text {
+                    text: root.country;
+                    font-size: 10px;
+                    color: is_active ? Theme.deep-black : Theme.text-secondary;
+                    horizontal-alignment: center;
+                    opacity: 0.8;
+                }
+
+                // 数量
+                if root.count > 0:
+                    Rectangle {
+                        background: is_active ? Theme.deep-black : Theme.cyber-blue;
+                        border-radius: 10px;
+                        height: 20px;
+
+                        Text {
+                            text: root.count + " GyID";
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: is_active ? Theme.cyber-blue : Theme.deep-black;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 位置记录卡片
+// ═══════════════════════════════════════════════════════════════
+export component LocationCard {
+    in property <string> gyid: "GyIDxxx";
+    in property <string> city: "城市";
+    in property <string> address: "详细地址";
+    in property <string> time: "时间";
+    in property <float> lat: 0.0;
+    in property <float> lon: 0.0;
+
+    Rectangle {
+        background: Theme.input-bg;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.card-border;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 8px;
+
+            // 顶部：GyID + 时间
+            HorizontalLayout {
+                Text {
+                    text: root.gyid;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: Theme.cyber-blue;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Text {
+                    text: root.time;
+                    font-size: 10px;
+                    color: Theme.text-secondary;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // 位置信息
+            HorizontalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: "📍";
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+
+                VerticalBox {
+                    spacing: 2px;
+
+                    Text {
+                        text: root.city;
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: Theme.text-primary;
+                    }
+
+                    Text {
+                        text: root.address;
+                        font-size: 10px;
+                        color: Theme.text-secondary;
+                    }
+                }
+            }
+
+            // 坐标
+            Text {
+                text: "(" + root.lat + ", " + root.lon + ")";
+                font-size: 9px;
+                color: Theme.text-secondary;
+                font-family: "Consolas";
+                horizontal-alignment: left;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 六边形网格背景
+// ═══════════════════════════════════════════════════════════════
+export component HexGridBackground {
+    in property <color> line_color: Theme.card-border;
+    in property <float> cell_size: 40.0;
+
+    // 简化版本：使用重复矩形模拟网格
+    Rectangle {
+        background: transparent;
+
+        // 斜线背景效果
+        Rectangle {
+            background: line_color;
+            opacity: 0.1;
+            border-radius: 2px;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 区域统计卡片
+// ═══════════════════════════════════════════════════════════════
+export component RegionStat {
+    in property <string> region_icon: "🌏";
+    in property <string> region_name: "地区";
+    in property <int> location_count: 0;
+    in property <int> gyid_count: 0;
+    in property <float> coverage: 0.0;  // 覆盖率 0-1
+
+    Rectangle {
+        background: Theme.input-bg;
+        border-radius: 10px;
+        padding: 12px;
+
+        VerticalLayout {
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: root.region_icon;
+                    font-size: 18px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.region_name;
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: Theme.text-primary;
+                    vertical-alignment: center;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 16px;
+
+                VerticalBox {
+                    spacing: 2px;
+
+                    Text {
+                        text: root.location_count;
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Text {
+                        text: "位置";
+                        font-size: 10px;
+                        color: Theme.text-secondary;
+                    }
+                }
+
+                VerticalBox {
+                    spacing: 2px;
+
+                    Text {
+                        text: root.gyid_count;
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: Theme.neon-green;
+                    }
+
+                    Text {
+                        text: "GyID";
+                        font-size: 10px;
+                        color: Theme.text-secondary;
+                    }
+                }
+            }
+
+            // 覆盖率进度
+            Rectangle {
+                height: 4px;
+                background: Theme.card-border;
+                border-radius: 2px;
+
+                Rectangle {
+                    width: parent.width * root.coverage;
+                    height: 4px;
+                    background: Theme.cyber-magenta;
+                    border-radius: 2px;
+                }
+            }
+
+            Text {
+                text: "覆盖 " + (root.coverage * 100) + "%";
+                font-size: 9px;
+                color: Theme.text-secondary;
+                horizontal-alignment: right;
+            }
+        }
+    }
+}

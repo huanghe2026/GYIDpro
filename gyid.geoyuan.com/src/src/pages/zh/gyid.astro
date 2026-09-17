@@ -1,0 +1,9 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Gyid from '../../components/pages/Gyid.astro';
+import { pages } from '../../i18n/content';
+const locale = 'zh';
+---
+<Layout locale={locale} path="/zh/gyid" title="GyID — 地理元身份协议" description={pages.zh.gyid.hero.desc}>
+  <Gyid locale={locale} />
+</Layout>

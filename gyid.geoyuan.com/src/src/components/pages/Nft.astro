@@ -1,0 +1,82 @@
+---
+import { pages } from '../../i18n/content';
+interface Props {
+  locale: 'en' | 'zh';
+}
+const { locale } = Astro.props;
+const t = pages[locale].nft;
+const statusColor: Record<string, string> = {
+  ACTIVE: 'var(--color-cyber-green)',
+  'PLANNED': 'var(--color-cyber-yellow)',
+  FUTURE: 'var(--color-cyber-cyan)',
+  '进行中': 'var(--color-cyber-green)',
+  '计划中': 'var(--color-cyber-yellow)',
+  '未来': 'var(--color-cyber-cyan)',
+};
+---
+
+<!-- HERO -->
+<section class="py-24 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto text-center fade-in-up">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.hero.badge}</div>
+    <h1 class="font-orbitron font-black text-4xl md:text-5xl text-cyber-text">{t.hero.title}</h1>
+    <p class="neon-cyan font-orbitron text-lg md:text-xl mt-3">{t.hero.subtitle}</p>
+    <p class="section-subtitle mx-auto text-center mt-6">{t.hero.desc}</p>
+  </div>
+</section>
+
+<!-- LIVE -->
+<section class="py-16 px-4 sm:px-6">
+  <div class="max-w-5xl mx-auto">
+    <div class="cyber-card cyber-corner p-8 md:p-10 flex flex-col md:flex-row items-center gap-8" style="border-color: rgba(0,240,255,0.3);">
+      <div class="flex-1">
+        <div class="cyber-badge mb-4 inline-flex">{t.live.badge}</div>
+        <h2 class="font-orbitron font-black text-2xl md:text-3xl text-cyber-text mb-2">{t.live.title}</h2>
+        <p class="font-mono text-cyber-cyan mb-4">{t.live.host} · {t.live.name}</p>
+        <p class="text-cyber-text-dim text-base leading-relaxed mb-4">{t.live.desc}</p>
+        <div class="flex flex-wrap gap-2">
+          {t.live.tags.map((tag) => <span class="font-mono text-xs text-cyber-border border border-cyber-border px-2 py-0.5">{tag}</span>)}
+        </div>
+      </div>
+      <div class="flex flex-col gap-3 w-full md:w-auto">
+        <a href={t.live.primaryBtn.href} target="_blank" rel="noopener" class="btn-cyber whitespace-nowrap">{t.live.primaryBtn.label}</a>
+        <a href={t.live.secondaryBtn.href} class="btn-cyber-outline text-center">{t.live.secondaryBtn.label}</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap" class="py-16 px-4 sm:px-6" style="background: rgba(0,0,0,0.25);">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-14">
+      <div class="cyber-badge mb-4 mx-auto inline-flex">{t.roadmap.badge}</div>
+      <h2 class="section-title font-orbitron">{t.roadmap.title}</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {
+        t.roadmap.items.map((it) => (
+          <div class="cyber-card cyber-corner p-6">
+            <div class="font-mono text-xs text-cyber-text-dim mb-2">{it.date}</div>
+            <h3 class="font-orbitron font-bold text-cyber-text mb-2">{it.title}</h3>
+            <span class="inline-block font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 mb-3" style={`color:${statusColor[it.status] || 'var(--color-cyber-cyan)'}; border:1px solid ${statusColor[it.status] || 'var(--color-cyber-cyan)'};`}>{it.status}</span>
+            <p class="text-cyber-text-dim text-sm leading-relaxed">{it.desc}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- BUILD WITH US -->
+<section class="py-16 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto text-center">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.build.badge}</div>
+    <h2 class="section-title font-orbitron mb-4">{t.build.title}</h2>
+    <p class="text-cyber-text-dim text-base max-w-2xl mx-auto mb-8 leading-relaxed">{t.build.desc}</p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href={t.build.primaryBtn.href} class="btn-cyber">{t.build.primaryBtn.label}</a>
+      <a href={t.build.secondaryBtn.href} class="btn-cyber-outline">{t.build.secondaryBtn.label}</a>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Gyid from '../components/pages/Gyid.astro';
+import { pages } from '../i18n/content';
+const locale = 'en';
+---
+<Layout locale={locale} path="/gyid" title="GyID — Geoyuan Identity Protocol" description={pages.en.gyid.hero.desc}>
+  <Gyid locale={locale} />
+</Layout>

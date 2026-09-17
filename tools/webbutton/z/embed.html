@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d1b3e">
+  <title>GYID 生成器 - GEOYUAN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/gyid-webbutton.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      background: transparent;
+    }
+    #gyid-widget-root {
+      height: 100%;
+    }
+    .gyid-widget {
+      position: relative;
+      bottom: auto;
+      right: auto;
+      transform: none;
+      opacity: 1;
+      width: 100%;
+      height: 100%;
+    }
+    .gyid-widget-panel {
+      position: relative;
+      bottom: auto;
+      right: auto;
+      display: block;
+      width: 100%;
+      max-height: 100%;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .gyid-widget-body {
+      max-height: calc(100vh - 60px);
+    }
+    .gyid-widget-header {
+      border-radius: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="gyid-widget-root"></div>
+  
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/gyid-webbutton.js"></script>
+  <script>
+    // 自动初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      GyIDWebButton.init({
+        position: 'bottom-right',
+        locale: 'zh-CN',
+        features: {
+          fingerprint: true,
+          geo: true,
+          avatar: true,
+          chain: true,
+          qrExport: true
+        },
+        onGyIdGenerated: (result) => {
+          // 向父窗口发送消息
+          if (window.parent !== window) {
+            window.parent.postMessage({
+              type: 'GYID_GENERATED',
+              data: result
+            }, '*');
+          }
+        }
+      });
+    });
+    
+    // 监听来自父窗口的消息
+    window.addEventListener('message', (event) => {
+      const { type, data } = event.data || {};
+      
+      switch (type) {
+        case 'SET_LOCATION':
+          // 父窗口设置位置信息
+          break;
+        case 'SET_CHAIN':
+          // 父窗口设置链上锚定选项
+          break;
+        case 'CLOSE':
+          // 父窗口请求关闭
+          break;
+      }
+    });
+  </script>
+</body>
+</html>

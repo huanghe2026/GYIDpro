@@ -1,0 +1,31 @@
+[package]
+name = "trip-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "IETF TRIP draft-ayerbe-trip-protocol-04 protocol core: breadcrumbs, epochs, PoH certificates with deterministic CBOR"
+
+[dependencies]
+# 签名（RFC 8032 Ed25519）
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+# CSPRNG（ProtocolKey::generate）
+rand_core = { version = "0.6", features = ["getrandom"] }
+# 哈希（块哈希 / Merkle / context digest）
+sha2 = "0.10"
+# 错误类型
+thiserror = "1.0"
+# H3 v4 空间量化（纯 Rust，WASM/移动端友好）：位移提取与 MC 轨迹量化
+h3o = "0.7"
+# Levy 采样器与 MC 轨迹仿真（StdRng ChaCha12，可复现）
+rand = "0.8"
+
+[dev-dependencies]
+# 黄金向量生成与测试
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+
+[lib]
+name = "trip_core"
+crate-type = ["rlib"]

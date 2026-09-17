@@ -1,0 +1,108 @@
+{
+  "conclusions": {
+    "control_max_frac_bio": 0.0053,
+    "levy_iid_alpha_p50": 0.0011079776078983087,
+    "levy_iid_bridge_g_frac_in_range": 0.0043,
+    "literal_generator_fails_bridge": true,
+    "trip_minus_control_frac_bio_gap": 0.5599000000000001,
+    "trip_separates_from_controls": true,
+    "trip_walk_alpha_p50": 0.5292258681719667,
+    "trip_walk_beta_fit_mean_abs_err": 1.1531129890584817,
+    "trip_walk_bridge_g_frac_in_range": 0.5507,
+    "trip_walk_frac_bio": 0.5652
+  },
+  "generated_by": "trip-core examples/monte_carlo (deterministic seeds)",
+  "groups": {
+    "correlated_gaussian": {
+      "alpha": {
+        "frac_in_bio_030_080": 0.0,
+        "mean": 2.0046307270075014,
+        "p05": 1.7161197892845708,
+        "p50": 1.8395912431747063,
+        "p95": 2.966666977912141,
+        "std": 0.38244708526393423
+      },
+      "generator": "|∫ AR(1) velocity (phi=0.9)| + 1e-3 km",
+      "trajectories": 10000
+    },
+    "levy_iid": {
+      "alpha": {
+        "frac_in_bio_030_080": 0.0114,
+        "mean": 0.005421941248090236,
+        "p05": -0.1753782953804612,
+        "p50": 0.0011079776078983087,
+        "p95": 0.19851307664605028,
+        "std": 0.1138863229108249
+      },
+      "beta_draw": "U[1.50, 1.90]",
+      "beta_fit_subsample": {
+        "max_abs_err": 0.36937830365821855,
+        "mean_abs_err": 0.10384646327878948,
+        "n": 100
+      },
+      "bridge_g": {
+        "frac_in_03_07": 0.0043,
+        "p05": -0.13510117388732892,
+        "p50": 0.0008590599562532131,
+        "p95": 0.15454004136580118
+      },
+      "duplicates_dropped_mean": 1.0883,
+      "generator": "draft §7.3.3 literal: i.i.d. truncated Levy steps, random heading, H3 res10, §4.1 dedup",
+      "kappa_draw": "lognormal(median=5km, sigma=1)",
+      "trajectories": 10000
+    },
+    "random_walk": {
+      "alpha": {
+        "frac_in_bio_030_080": 0.0053,
+        "mean": 0.006556932864610597,
+        "p05": -0.1990924911294049,
+        "p50": 0.008045575915912593,
+        "p95": 0.20154544423386508,
+        "std": 0.12179139449825944
+      },
+      "generator": "i.i.d. |N(0,1)|·0.5 + 0.2 km",
+      "trajectories": 10000
+    },
+    "replay_with_drift": {
+      "alpha": {
+        "frac_in_bio_030_080": 0.0,
+        "mean": 1.2331071029069203,
+        "p05": 1.233087590255164,
+        "p50": 1.2331071129205695,
+        "p95": 1.2331266762375679,
+        "std": 0.000011956740570720528
+      },
+      "generator": "shared recorded series + 0.05 km/step drift + 1e-4 km jitter",
+      "trajectories": 10000
+    },
+    "trip_walk": {
+      "alpha": {
+        "frac_in_bio_030_080": 0.5652,
+        "mean": 0.5191931376054774,
+        "p05": 0.010293660204093892,
+        "p50": 0.5292258681719667,
+        "p95": 1.0200887483567325,
+        "std": 0.30762589071296503
+      },
+      "beta_draw": "U[1.50, 1.90]",
+      "beta_fit_subsample": {
+        "max_abs_err": 1.493566600815809,
+        "mean_abs_err": 1.1531129890584817,
+        "n": 100
+      },
+      "bridge_g": {
+        "frac_in_03_07": 0.5507,
+        "p05": 0.008405226627791971,
+        "p50": 0.40461099312891663,
+        "p95": 0.7992326563160571
+      },
+      "duplicates_dropped_mean": 755.2245,
+      "generator": "GeoYuan trip walk: Levy trip distance split into n~U{1..16} correlated sub-steps, jitter σ=0.5, heading jitter 0.35 rad",
+      "kappa_draw": "lognormal(median=5km, sigma=1)",
+      "trajectories": 10000
+    }
+  },
+  "scientific_note": "§7.3.3 literal generator (i.i.d. truncated Levy) yields a flat displacement spectrum (alpha~0) and fails the §7.3 bridge check; amplitude-envelope modulation is also nullified by the heavy-tailed noise and §4.1 dedup gating. GeoYuan's trip-structured walk (a Levy trip distance split into correlated sub-steps) restores the biological band. Trip-structured series also bias the i.i.d.-Levy MLE beta_hat upward (mean |err| ~1.15 vs true beta); alpha classification and the fitted 99.9% anomaly threshold remain usable. Per-trajectory alpha at window 256 is noisy (std ~0.3): band membership requires multi-window accumulation (W4 trust scoring), not single-shot rejection. Literal group reported honestly as upstream draft feedback.",
+  "spec": "draft-ayerbe-trip-protocol-04 §7.3.3 Numerical Validation",
+  "window_displacements": 256
+}

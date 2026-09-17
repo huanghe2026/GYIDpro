@@ -1,0 +1,15 @@
+---
+import { pages } from '../../i18n/content';
+interface Props {
+  locale: 'en' | 'zh';
+}
+const { locale } = Astro.props;
+const t = pages[locale].notFound;
+---
+
+<section class="py-32 px-4 sm:px-6 text-center">
+  <div class="font-orbitron font-black text-8xl md:text-9xl neon-cyan mb-4">{t.code}</div>
+  <div class="cyber-badge mb-6 mx-auto inline-flex">{t.title}</div>
+  <p class="text-cyber-text-dim text-lg mb-10">{t.desc}</p>
+  <a href={t.btn.href} class="btn-cyber inline-flex">{t.btn.label}</a>
+</section>

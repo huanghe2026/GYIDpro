@@ -1,0 +1,72 @@
+---
+import Logo from './Logo.astro';
+import { nav } from '../i18n/content';
+import { swapLocale } from '../i18n/utils';
+
+interface Props {
+  locale: 'en' | 'zh';
+  path: string;
+}
+const { locale, path } = Astro.props;
+const items = nav[locale];
+const other: 'en' | 'zh' = locale === 'en' ? 'zh' : 'en';
+const langLabel = locale === 'en' ? '中文' : 'EN';
+const langHref = swapLocale(path, other);
+const downloadHref = locale === 'en' ? '/download' : '/zh/download';
+---
+
+<header class="fixed top-0 left-0 right-0 z-40 border-b border-cyber-border" style="background: rgba(10,10,15,0.85); backdrop-filter: blur(12px);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="flex items-center justify-between h-16">
+      <Logo locale={locale} />
+
+      <!-- Desktop nav -->
+      <nav class="hidden md:flex items-center gap-6">
+        {
+          items.map((it) => (
+            <a href={it.href} class={`nav-link ${it.href === path ? 'active' : ''}`}>
+              {it.label}
+            </a>
+          ))
+        }
+      </nav>
+
+      <!-- Right: lang switch + CTA + mobile toggle -->
+      <div class="flex items-center gap-3">
+        <a
+          href={langHref}
+          onclick="sessionStorage.setItem('lang-chosen','manual')"
+          class="font-mono text-xs text-cyber-text-dim hover:text-cyber-cyan transition-colors border border-cyber-border px-2 py-1"
+        >
+          {langLabel}
+        </a>
+        <a href={downloadHref} class="btn-cyber text-sm hidden sm:inline-flex">⬇ {locale === 'en' ? 'Download' : '下载'}</a>
+
+        <!-- Mobile menu button -->
+        <button id="menu-toggle" class="md:hidden text-cyber-cyan text-2xl leading-none px-2" aria-label="Menu">☰</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile dropdown -->
+  <div id="mobile-menu" class="md:hidden hidden border-t border-cyber-border" style="background: rgba(10,10,15,0.97);">
+    <nav class="flex flex-col px-4 py-3 gap-1">
+      {
+        items.map((it) => (
+          <a href={it.href} class={`nav-link py-2 ${it.href === path ? 'active' : ''}`}>
+            {it.label}
+          </a>
+        ))
+      }
+      <a href={downloadHref} class="btn-cyber text-sm mt-2 justify-center">⬇ {locale === 'en' ? 'Download' : '下载'}</a>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const btn = document.getElementById('menu-toggle');
+  const menu = document.getElementById('mobile-menu');
+  btn?.addEventListener('click', () => {
+    menu?.classList.toggle('hidden');
+  });
+</script>

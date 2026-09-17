@@ -1,0 +1,115 @@
+[package]
+name = "gyid-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[features]
+default = ["native", "chain-signing"]
+# 原生平台功能（SQLite 存储、sysinfo、reqwest）
+native = [
+    "dep:rusqlite",
+    "dep:sysinfo",
+    "dep:reqwest",
+    "dep:tokio",
+    "dep:dirs",
+]
+# WASM 平台（跳过所有 native 依赖，使用 JS API）
+wasm = []
+# 链上签名功能（需要 k256 + tiny-keccak）
+chain-signing = ["dep:k256", "dep:tiny-keccak"]
+# Aptos 链签名功能（需要 ed25519-dalek + bcs）
+aptos-signing = ["dep:ed25519-dalek", "dep:bcs"]
+# 同步阻塞 API
+sync = []
+
+[dependencies]
+# 哈希算法（WASM 可用）
+blake3.workspace = true
+sha2.workspace = true
+
+# 序列化（WASM 可用）
+serde.workspace = true
+serde_json.workspace = true
+
+# 编码（WASM 可用）
+base58.workspace = true
+
+# 错误处理（WASM 可用）
+thiserror.workspace = true
+anyhow.workspace = true
+
+# 时间（WASM 可用）
+chrono.workspace = true
+
+# 随机数（WASM 可用，getrandom 需要 js feature）
+rand.workspace = true
+
+# hex 编码（WASM 可用）
+hex.workspace = true
+
+# 日志（WASM 可用）
+tracing.workspace = true
+
+# 图片处理（WASM 可用，不需要 native）
+image.workspace = true
+
+# 跨平台硬件信息（仅 native）
+sysinfo = { workspace = true, optional = true }
+
+# UUID（WASM 可用）
+uuid.workspace = true
+
+# 网络请求（仅 native，WASM 使用 fetch API）
+reqwest = { workspace = true, optional = true }
+
+# 异步运行时（仅 native，WASM 使用 browser event loop）
+tokio = { workspace = true, optional = true }
+
+# 数据库（仅 native）
+rusqlite = { workspace = true, optional = true }
+
+# 目录（仅 native）
+dirs = { workspace = true, optional = true }
+
+# 日志订阅（非 WASM）
+tracing-subscriber = { workspace = true, optional = true }
+
+# 可选：链上签名
+k256 = { version = "0.13", features = ["ecdsa"], optional = true }
+tiny-keccak = { version = "2", features = ["keccak"], optional = true }
+
+# Aptos 签名
+ed25519-dalek = { version = "2", features = ["rand_core"], optional = true }
+bcs = { version = "0.1", optional = true }
+
+# H3 六边形地理网格系统（纯 Rust，支持 WASM）
+h3o = "0.9"
+
+# 同步原语（WASM 可用的高性能锁）
+parking_lot = "0.12"
+
+# 跨平台支持 (Windows GPS)
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Devices_Geolocation",
+    "Foundation",
+    "Foundation_Collections",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["full"] }
+
+[[test]]
+name = "integration_tests"
+path = "../tests/integration_tests.rs"
+
+[[test]]
+name = "timing_test"
+path = "../tests/timing_test.rs"
+

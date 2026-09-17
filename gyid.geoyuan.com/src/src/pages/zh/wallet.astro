@@ -1,0 +1,9 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Wallet from '../../components/pages/Wallet.astro';
+import { pages } from '../../i18n/content';
+const locale = 'zh';
+---
+<Layout locale={locale} path="/zh/wallet" title="GeoYuan 钱包 — 地理元" description={pages.zh.wallet.hero.desc}>
+  <Wallet locale={locale} />
+</Layout>

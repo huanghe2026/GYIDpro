@@ -1,0 +1,2791 @@
+// GeoYuan - 主窗口 (Slint 1.8)
+// 赛博朋克风格 · 地理身份注册 + 游戏化
+import { VerticalBox, HorizontalBox, Button, LineEdit } from "std-widgets.slint";
+import { Theme, CyberButton, CyberButtonOutline, StepItem,
+         PhotoDropZone, ProgressStep, NavItem, TransactionItem,
+         EnergyBar, AchievementBadge, TaskItem, RankItem,
+         MapMarker, LocationCard, RegionStat } from "widgets.slint";
+
+// ═══════════════════════════════════════════════════════════════
+// 主窗口
+// ═══════════════════════════════════════════════════════════════
+export component MainWindow inherits Window {
+    title: "GeoYuan - 注册您的地理身份";
+    min-width: 900px;
+    min-height: 600px;
+    max-width: 1920px;
+    max-height: 1080px;
+    background: Theme.deep-black;
+
+    // 页面: login | photo | locating | success | wallet | history | transfer | settings | verify | achievements | explore | devices
+    in-out property <string> current_page: "login";
+    in-out property <string> photo_path: "";
+    in-out property <string> location_text: "等待定位...";
+    in-out property <string> gy_id: "";
+    in-out property <string> error_text: "";
+    in-out property <float>  progress: 0.0;
+
+    // 验证相关
+    in-out property <string> verify_input: "";
+    in-out property <string> verify_result: "";
+    in-out property <string> verify_hash: "";
+    in-out property <bool>   verify_valid: false;
+    in-out property <string> scan_source: "gallery"; // "gallery" | "camera"
+
+    // 游戏化相关
+    in-out property <float>  energy: 80.0;          // 当前能量
+    in-out property <float>  energy_max: 100.0;     // 最大能量
+    in-out property <int>    achievements_unlocked: 3;   // 已解锁成就
+    in-out property <int>    achievements_total: 9;       // 总成就
+    in-out property <int>    rank: 1234;            // 我的排名
+    in-out property <string> gy_balance: "2.0";     // GY 余额
+
+    // 钱包相关
+    in-out property <string> wallet_address: "0x0000...0000";  // 钱包地址
+    in-out property <string> wallet_status: "离线";            // 节点状态
+    in-out property <int>    peer_count: 0;                    // 连接节点数
+
+    // 探索相关
+    in-out property <int>    total_locations: 2;    // 总位置数
+    in-out property <int>    total_gyids: 2;        // 总 GyID 数
+    in-out property <string> coverage_text: "0%";  // 覆盖率
+    in-out property <string> selected_city: "";      // 选中的城市
+    in-out property <bool>   map_loading: false;    // 地图加载中
+
+    // 设置相关（可编辑）
+    in-out property <string> amap_key_input: "";       // 高德 Key 输入
+    in-out property <string> polygon_rpc_input: "";     // Polygon RPC 输入
+    in-out property <string> settings_save_result: ""; // 保存结果提示
+
+    // Rust 端回调
+    callback request_photo_pick();
+    callback start_generate(string);
+    callback copy_gyid(string);
+    callback export_json(string);
+    callback verify_gyid(string);
+    callback scan_qr_code();
+    callback paste_gyid();                            // 从剪贴板粘贴 GyID
+    callback refresh_wallet();                      // 刷新钱包数据
+    callback send_transfer(string, string);         // 发送转账 (地址, 金额)
+    callback load_transactions();                   // 加载交易历史
+    callback generate_auth_code();                  // 生成授权码（主设备模式）
+    callback link_device(string);                   // 使用授权码关联设备（从设备模式）
+    callback load_device_list();                    // 加载设备列表
+    callback save_settings(string, string, bool);   // 保存设置（高德Key, PolygonRPC, P2P同步开关）
+
+    // 转账页输入（双向绑定用）
+    in-out property <string> transfer_address: "";
+    in-out property <string> transfer_amount: "";
+    in-out property <string> transfer_msg: "";      // 转账结果消息
+    in-out property <string> transfer_available: ""; // 可转账余额
+
+    // 钱包同步相关
+    in-out property <bool> wallet_sync_enabled: false;  // 钱包同步开关
+    in-out property <string> wallet_sync_status: "未连接"; // 同步状态文字
+    in-out property <string> wallet_sync_last: "";       // 上次同步时间
+
+    // 设备关联相关
+    in-out property <string> device_link_auth_code: "";   // 输入的授权码
+    in-out property <string> device_link_result: "";      // 关联结果消息
+    in-out property <string> device_link_role: "未关联";  // 本设备角色
+    in-out property <string> device_link_master: "";      // 主设备 GyID
+    in-out property <int>    device_link_count: 0;        // 关联设备数量
+    in-out property <string> device_list_text: "";        // 设备列表文本
+
+    // 历史页动态数据（由 Rust 设置）
+    in-out property <string> history_count: "0";
+    in-out property <string> history_mint_count: "0";
+    in-out property <string> history_transfer_count: "0";
+    in-out property <string> tx1_icon: "";
+    in-out property <string> tx1_title: "";
+    in-out property <string> tx1_amount: "";
+    in-out property <string> tx1_time: "";
+    in-out property <string> tx1_status: "";
+    in-out property <string> tx2_icon: "";
+    in-out property <string> tx2_title: "";
+    in-out property <string> tx2_amount: "";
+    in-out property <string> tx2_time: "";
+    in-out property <string> tx2_status: "";
+    in-out property <string> tx3_icon: "";
+    in-out property <string> tx3_title: "";
+    in-out property <string> tx3_amount: "";
+    in-out property <string> tx3_time: "";
+    in-out property <string> tx3_status: "";
+    in-out property <string> tx4_icon: "";
+    in-out property <string> tx4_title: "";
+    in-out property <string> tx4_amount: "";
+    in-out property <string> tx4_time: "";
+    in-out property <string> tx4_status: "";
+    in-out property <string> tx5_icon: "";
+    in-out property <string> tx5_title: "";
+    in-out property <string> tx5_amount: "";
+    in-out property <string> tx5_time: "";
+    in-out property <string> tx5_status: "";
+
+    // 钱包页最近交易（动态数据）
+    in-out property <string> wallet_tx1_icon: "";
+    in-out property <string> wallet_tx1_title: "";
+    in-out property <string> wallet_tx1_amount: "";
+    in-out property <string> wallet_tx1_time: "";
+    in-out property <string> wallet_tx1_status: "";
+    in-out property <string> wallet_tx2_icon: "";
+    in-out property <string> wallet_tx2_title: "";
+    in-out property <string> wallet_tx2_amount: "";
+    in-out property <string> wallet_tx2_time: "";
+    in-out property <string> wallet_tx2_status: "";
+
+    // ═══════════════════════════════════════════════════════════
+    // 登录页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "login": Rectangle {
+        background: Theme.deep-black;
+
+        VerticalLayout {
+            alignment: center;
+            padding: 40px;
+
+            Text {
+                text: "GEOYUAN";
+                font-size: 72px;
+                font-weight: 900;
+                color: Theme.cyber-blue;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 12px; }
+
+            Text {
+                text: "地理元 · 位置证明 · 数字身份";
+                font-size: 18px;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 48px; }
+
+            HorizontalLayout {
+                alignment: center;
+
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.cyber-blue;
+                    width: 440px;
+
+                    VerticalLayout {
+                        padding: 40px;
+                        spacing: 24px;
+
+                        Text {
+                            text: "创建新身份";
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: Theme.text-primary;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "上传一张带有GPS信息的照片\n即可生成您的地理身份 GyID";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                            horizontal-alignment: center;
+                        }
+
+                        StepItem { num: "01"; label: "拍摄或选择照片"; desc: "照片需包含EXIF GPS信息"; }
+                        StepItem { num: "02"; label: "高德SDK精确定位"; desc: "精度达到1-3米"; }
+                        StepItem { num: "03"; label: "生成 GyID + 首枚 Geoyuan"; desc: "获得您的地理身份"; }
+
+                        CyberButton {
+                            label: "开始注册";
+                            clicked => { root.current_page = "photo"; }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 32px; }
+
+            Text {
+                text: "© 2026 GeoYuan Foundation · 开源协议 · 保护隐私";
+                font-size: 12px;
+                color: #4A5568;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 照片选择页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "photo": Rectangle {
+        background: Theme.deep-black;
+
+        VerticalLayout {
+            alignment: center;
+            padding: 40px;
+
+            Text {
+                text: "选择照片";
+                font-size: 36px;
+                font-weight: 700;
+                color: Theme.text-primary;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 8px; }
+
+            Text {
+                text: "请选择一张包含GPS信息的照片";
+                font-size: 16px;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 32px; }
+
+            HorizontalLayout {
+                alignment: center;
+
+                PhotoDropZone {
+                    photo_path: root.photo_path;
+                    on_pick => { root.request_photo_pick(); }
+                }
+            }
+
+            Rectangle { height: 24px; }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 16px;
+
+                CyberButtonOutline {
+                    label: "从相册选择";
+                    clicked => { root.request_photo_pick(); }
+                }
+
+                if root.photo_path != "":
+                    CyberButton {
+                        label: "确认照片";
+                        clicked => {
+                            root.current_page = "locating";
+                            root.start_generate(root.photo_path);
+                        }
+                    }
+            }
+
+            Rectangle { height: 32px; }
+
+            TouchArea {
+                width: 80px;
+                height: 32px;
+                clicked => { root.current_page = "login"; }
+
+                Text {
+                    text: "← 返回";
+                    font-size: 14px;
+                    color: Theme.text-secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 定位/生成中页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "locating": Rectangle {
+        background: Theme.deep-black;
+
+        VerticalLayout {
+            alignment: center;
+            padding: 40px;
+
+            Text {
+                text: "正在生成身份...";
+                font-size: 32px;
+                font-weight: 700;
+                color: Theme.text-primary;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 32px; }
+
+            HorizontalLayout {
+                alignment: center;
+
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.cyber-blue;
+                    width: 520px;
+
+                    VerticalLayout {
+                        padding: 40px;
+                        spacing: 0px;
+
+                        ProgressStep { step_title: "读取照片"; step_status: "完成"; done: true; }
+                        ProgressStep { step_title: "解析GPS信息"; step_status: "完成"; done: true; }
+                        ProgressStep { step_title: "高德SDK定位"; step_status: root.location_text; done: false; }
+                        ProgressStep { step_title: "生成 GyID"; step_status: "等待..."; done: false; }
+                        ProgressStep { step_title: "铸造首枚 Geoyuan"; step_status: "等待..."; done: false; }
+
+                        Rectangle { height: 24px; }
+
+                        Rectangle {
+                            height: 4px;
+                            background: Theme.card-border;
+                            border-radius: 2px;
+
+                            Rectangle {
+                                width: parent.width * root.progress;
+                                height: 4px;
+                                background: Theme.cyber-blue;
+                                border-radius: 2px;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if root.error_text != "":
+                Rectangle { height: 24px; }
+
+            if root.error_text != "":
+                HorizontalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        background: Theme.danger;
+                        border-radius: 8px;
+                        width: 520px;
+
+                        Text {
+                            text: root.error_text;
+                            font-size: 14px;
+                            color: Theme.text-primary;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+
+            Rectangle { height: 32px; }
+
+            TouchArea {
+                width: 80px;
+                height: 32px;
+                clicked => { root.current_page = "photo"; }
+
+                Text {
+                    text: "← 取消";
+                    font-size: 14px;
+                    color: Theme.text-secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 成功页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "success": Rectangle {
+        background: Theme.deep-black;
+
+        VerticalLayout {
+            alignment: center;
+            padding: 40px;
+
+            Text {
+                text: "注册成功!";
+                font-size: 48px;
+                font-weight: 900;
+                color: Theme.neon-green;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 8px; }
+
+            Text {
+                text: "您的地理身份已生成";
+                font-size: 20px;
+                color: Theme.text-secondary;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { height: 32px; }
+
+            HorizontalLayout {
+                alignment: center;
+
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    border-width: 2px;
+                    border-color: Theme.cyber-blue;
+                    width: 540px;
+
+                    VerticalLayout {
+                        padding: 32px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "您的 GyID";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: root.gy_id;
+                            font-size: 20px;
+                            font-weight: 700;
+                            color: Theme.cyber-blue;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+
+                        Rectangle { height: 8px; }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 12px;
+
+                            CyberButtonOutline {
+                                label: "复制 GyID";
+                                clicked => { root.copy_gyid(root.gy_id); }
+                            }
+
+                            CyberButtonOutline {
+                                label: "导出 JSON";
+                                clicked => { root.export_json(root.gy_id); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 24px; }
+
+            HorizontalLayout {
+                alignment: center;
+
+                Rectangle {
+                    background: #00D9FF15;
+                    border-radius: 12px;
+                    border-width: 1px;
+                    border-color: #00D9FF40;
+                    width: 540px;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 8px;
+
+                        Text {
+                            text: "✨ 获得首枚 Geoyuan";
+                            font-size: 20px;
+                            font-weight: 700;
+                            color: Theme.cyber-yellow;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "基于您的位置数据铸造";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 32px; }
+
+            CyberButton {
+                label: "进入钱包";
+                width: 200px;
+                clicked => { root.current_page = "wallet"; }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 历史记录页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "history": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏 (复用钱包页侧边)
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "wallet"; }
+                    }
+                    NavItem {
+                        nav_icon: "📷"; nav_label: "拍摄挖矿";
+                        on_clicked => { root.current_page = "photo"; }
+                    }
+                    NavItem {
+                        nav_icon: "🗺️"; nav_label: "探索";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史记录";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔄"; nav_label: "转账";
+                        on_clicked => { root.current_page = "transfer"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔐"; nav_label: "验证 GyID";
+                        on_clicked => { root.current_page = "verify"; }
+                    }
+                    NavItem {
+                        nav_icon: "📱"; nav_label: "设备";
+                        on_clicked => { root.current_page = "devices"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容
+            VerticalLayout {
+                spacing: 16px;
+                horizontal-stretch: 1;
+
+                // 标题栏
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+
+                        HorizontalLayout {
+                            Text {
+                                text: "GyID 历史记录";
+                                font-size: 24px;
+                                font-weight: 700;
+                                color: Theme.text-primary;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            TouchArea {
+                                width: 120px;
+                                height: 36px;
+                                clicked => { root.current_page = "wallet"; }
+
+                                Rectangle {
+                                    background: Theme.input-bg;
+                                    border-radius: 8px;
+                                    width: 100%;
+                                    height: 100%;
+
+                                    Text {
+                                        text: "← 返回钱包";
+                                        font-size: 13px;
+                                        color: Theme.text-secondary;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 筛选标签
+                        HorizontalLayout {
+                            spacing: 8px;
+
+                            Rectangle {
+                                background: Theme.cyber-blue;
+                                border-radius: 8px;
+                                height: 32px;
+
+                                Text {
+                                    text: "全部 (" + root.history_count + ")";
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: Theme.deep-black;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                background: Theme.input-bg;
+                                border-radius: 8px;
+                                height: 32px;
+
+                                Text {
+                                    text: "挖矿 (" + root.history_mint_count + ")";
+                                    font-size: 12px;
+                                    color: Theme.text-secondary;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                background: Theme.input-bg;
+                                border-radius: 8px;
+                                height: 32px;
+
+                                Text {
+                                    text: "转账 (" + root.history_transfer_count + ")";
+                                    font-size: 12px;
+                                    color: Theme.text-secondary;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 记录列表
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+
+                        // 动态交易项1
+                        if root.tx1_title != "" : TransactionItem {
+                            tx_icon: root.tx1_icon;
+                            tx_title: root.tx1_title;
+                            tx_amount: root.tx1_amount;
+                            tx_time: root.tx1_time;
+                            tx_status: root.tx1_status;
+                        }
+
+                        // 动态交易项2
+                        if root.tx2_title != "" : TransactionItem {
+                            tx_icon: root.tx2_icon;
+                            tx_title: root.tx2_title;
+                            tx_amount: root.tx2_amount;
+                            tx_time: root.tx2_time;
+                            tx_status: root.tx2_status;
+                        }
+
+                        // 动态交易项3
+                        if root.tx3_title != "" : TransactionItem {
+                            tx_icon: root.tx3_icon;
+                            tx_title: root.tx3_title;
+                            tx_amount: root.tx3_amount;
+                            tx_time: root.tx3_time;
+                            tx_status: root.tx3_status;
+                        }
+
+                        // 动态交易项4
+                        if root.tx4_title != "" : TransactionItem {
+                            tx_icon: root.tx4_icon;
+                            tx_title: root.tx4_title;
+                            tx_amount: root.tx4_amount;
+                            tx_time: root.tx4_time;
+                            tx_status: root.tx4_status;
+                        }
+
+                        // 动态交易项5
+                        if root.tx5_title != "" : TransactionItem {
+                            tx_icon: root.tx5_icon;
+                            tx_title: root.tx5_title;
+                            tx_amount: root.tx5_amount;
+                            tx_time: root.tx5_time;
+                            tx_status: root.tx5_status;
+                        }
+
+                        // 空状态
+                        if root.tx1_title == "" : Rectangle {
+                            height: 200px;
+                            Text {
+                                text: "暂无交易记录";
+                                font-size: 14px;
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 转账页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "transfer": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "wallet"; }
+                    }
+                    NavItem {
+                        nav_icon: "📷"; nav_label: "拍摄挖矿";
+                        on_clicked => { root.current_page = "photo"; }
+                    }
+                    NavItem {
+                        nav_icon: "🗺️"; nav_label: "探索";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史记录";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔐"; nav_label: "验证 GyID";
+                        on_clicked => { root.current_page = "verify"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔄"; nav_label: "转账";
+                        on_clicked => { root.current_page = "transfer"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.cyber-blue;
+
+                    VerticalLayout {
+                        padding: 40px;
+                        spacing: 24px;
+
+                        Text {
+                            text: "转账 GY";
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: Theme.text-primary;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "发送 Geoyuan 到其他 GyID";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                            horizontal-alignment: center;
+                        }
+
+                        Rectangle { height: 16px; }
+
+                        Text {
+                            text: "目标 GyID";
+                            font-size: 12px;
+                            color: Theme.text-secondary;
+                        }
+
+                        LineEdit {
+                            placeholder_text: "请输入接收方 GyID/TGyID/0x...";
+                            text <=> root.transfer_address;
+                            font-size: 14px;
+                            height: 48px;
+                        }
+
+                        Text {
+                            text: "转账数量";
+                            font-size: 12px;
+                            color: Theme.text-secondary;
+                        }
+
+                        LineEdit {
+                            placeholder_text: "0.0";
+                            text <=> root.transfer_amount;
+                            font-size: 14px;
+                            height: 48px;
+                            input-type: number;
+                        }
+
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 6px;
+                            height: 28px;
+
+                            Text {
+                                text: "可转账: " + root.transfer_available + " GY";
+                                font-size: 11px;
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // 转账结果消息
+                        if root.transfer_msg != "" : Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 6px;
+                            height: 48px;
+
+                            Text {
+                                text: root.transfer_msg;
+                                font-size: 12px;
+                                color: Theme.cyber-blue;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                wrap: word-wrap;
+                            }
+                        }
+
+                        CyberButton {
+                            label: "确认转账";
+                            width: 100%;
+                            clicked => {
+                                root.transfer_msg = "";
+                                root.send_transfer(root.transfer_address, root.transfer_amount);
+                            }
+                        }
+
+                        TouchArea {
+                            height: 32px;
+                            clicked => { root.current_page = "wallet"; }
+
+                            Text {
+                                text: "← 返回钱包";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 设备关联页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "devices": Rectangle {
+        background: Theme.deep-black;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            // 顶栏
+            HorizontalLayout {
+                spacing: 16px;
+                height: 48px;
+                alignment: center;
+
+                Text {
+                    text: "←";
+                    font-size: 24px;
+                    color: Theme.cyber-blue;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "设备关联";
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: Theme.text-primary;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Text {
+                    text: "🔗 " + root.device_link_role;
+                    font-size: 13px;
+                    color: Theme.neon-green;
+                    vertical-alignment: center;
+                }
+            }
+
+            // 当前设备信息卡片
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+
+                    Text {
+                        text: "当前设备";
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: Theme.text-primary;
+                    }
+
+                    HorizontalLayout {
+                        Text {
+                            text: "角色";
+                            font-size: 13px;
+                            color: Theme.text-secondary;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text {
+                            text: root.device_link_role;
+                            font-size: 13px;
+                            color: Theme.neon-green;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        Text {
+                            text: "主设备";
+                            font-size: 13px;
+                            color: Theme.text-secondary;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text {
+                            text: root.device_link_master != "" ? root.device_link_master : "—";
+                            font-size: 13px;
+                            color: Theme.text-primary;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        Text {
+                            text: "关联设备数";
+                            font-size: 13px;
+                            color: Theme.text-secondary;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text {
+                            text: root.device_link_count + " 台";
+                            font-size: 13px;
+                            color: Theme.text-primary;
+                        }
+                    }
+                }
+            }
+
+            // 主设备模式：生成授权码
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+
+                    Text {
+                        text: "📱 主设备：生成授权码";
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: Theme.text-primary;
+                    }
+
+                    Text {
+                        text: "在新设备上输入授权码即可完成关联。授权码 10 分钟内有效。";
+                        font-size: 12px;
+                        color: Theme.text-secondary;
+                        wrap: word-wrap;
+                    }
+
+                    CyberButton {
+                        label: "生成授权码";
+                        clicked => { root.generate_auth_code(); }
+                    }
+                }
+            }
+
+            // 从设备模式：输入授权码
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+
+                    Text {
+                        text: "🔗 从设备：输入授权码";
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: Theme.text-primary;
+                    }
+
+                    Text {
+                        text: "输入主设备提供的授权码完成设备关联。";
+                        font-size: 12px;
+                        color: Theme.text-secondary;
+                        wrap: word-wrap;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        height: 40px;
+
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: #333;
+
+                            HorizontalLayout {
+                                padding-left: 16px;
+                                padding-right: 16px;
+
+                                LineEdit {
+                                    text <=> root.device_link_auth_code;
+                                    placeholder-text: "输入授权码...";
+                                    font-size: 14px;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                        }
+
+                        CyberButton {
+                            label: "关联设备";
+                            clicked => { root.link_device(root.device_link_auth_code); }
+                        }
+                    }
+
+                    // 结果消息
+                    Text {
+                        text: root.device_link_result;
+                        font-size: 12px;
+                        color: Theme.neon-green;
+                        wrap: word-wrap;
+                        visible: root.device_link_result != "";
+                    }
+                }
+            }
+
+            // 已关联设备列表
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+
+                    HorizontalLayout {
+                        Text {
+                            text: "📋 已关联设备";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        Rectangle { horizontal-stretch: 1; }
+
+                        Text {
+                            text: root.device_link_count + " 台";
+                            font-size: 13px;
+                            color: Theme.text-secondary;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Text {
+                        text: root.device_list_text != "" ? root.device_list_text : "暂无关联设备。\n使用上方授权码功能添加新设备。";
+                        font-size: 13px;
+                        color: Theme.text-primary;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // 底部导航
+            HorizontalLayout {
+                height: 48px;
+                alignment: center;
+                spacing: 16px;
+
+                Rectangle { horizontal-stretch: 1; }
+                NavItem {
+                    nav_icon: "⚙️"; nav_label: "设置";
+                    on_clicked => { root.current_page = "settings"; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 设置页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "settings": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "wallet"; }
+                    }
+                    NavItem {
+                        nav_icon: "📷"; nav_label: "拍摄挖矿";
+                        on_clicked => { root.current_page = "photo"; }
+                    }
+                    NavItem {
+                        nav_icon: "🗺️"; nav_label: "探索";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史记录";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔐"; nav_label: "验证 GyID";
+                        on_clicked => { root.current_page = "verify"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔄"; nav_label: "转账";
+                        on_clicked => { root.current_page = "transfer"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容
+            VerticalLayout {
+                spacing: 16px;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: "设置";
+                    font-size: 28px;
+                    font-weight: 700;
+                    color: Theme.text-primary;
+                }
+
+                // API 配置
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+
+                        Text {
+                            text: "API 配置";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 8px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "高德地图 Key";
+                                    font-size: 12px;
+                                    color: Theme.text-secondary;
+                                }
+
+                                LineEdit {
+                                    text: root.amap_key_input;
+                                    edited(text) => { root.amap_key_input = text; }
+                                    placeholder-text: "输入高德地图 Key";
+                                    font-size: 13px;
+                                    height: 28px;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 8px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "Polygon RPC";
+                                    font-size: 12px;
+                                    color: Theme.text-secondary;
+                                }
+
+                                LineEdit {
+                                    text: root.polygon_rpc_input;
+                                    edited(text) => { root.polygon_rpc_input = text; }
+                                    placeholder-text: "输入 Polygon RPC 地址";
+                                    font-size: 13px;
+                                    height: 28px;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                        }
+
+                        CyberButton {
+                            label: "保存设置";
+                            clicked => { root.save_settings(root.amap_key_input, root.polygon_rpc_input, root.wallet_sync_enabled); }
+                        }
+
+                        Text {
+                            text: root.settings_save_result;
+                            font-size: 12px;
+                            color: root.settings_save_result == "保存成功" ? Theme.neon-green : Theme.danger;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+
+                // 网络配置
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+
+                        Text {
+                            text: "网络";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+
+                            Rectangle {
+                                background: Theme.neon-green;
+                                border-radius: 6px;
+                                height: 28px;
+
+                                Text {
+                                    text: "Polygon PoS";
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: Theme.deep-black;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                background: Theme.input-bg;
+                                border-radius: 6px;
+                                height: 28px;
+
+                                Text {
+                                    text: "Aptos";
+                                    font-size: 11px;
+                                    color: Theme.text-secondary;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 钱包同步
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+
+                        Text {
+                            text: "钱包同步";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        // 同步开关
+                        HorizontalLayout {
+                            spacing: 12px;
+                            height: 36px;
+                            alignment: center;
+
+                            Text {
+                                text: "P2P 钱包同步";
+                                font-size: 13px;
+                                color: Theme.text-primary;
+                                vertical-alignment: center;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            Rectangle {
+                                width: 48px;
+                                height: 26px;
+                                border-radius: 13px;
+                                background: root.wallet_sync_enabled ? Theme.neon-green : Theme.input-bg;
+
+                                Text {
+                                    text: root.wallet_sync_enabled ? "ON" : "OFF";
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: root.wallet_sync_enabled ? Theme.deep-black : Theme.text-secondary;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                TouchArea {
+                                    clicked => { root.wallet_sync_enabled = !root.wallet_sync_enabled; }
+                                }
+                            }
+                        }
+
+                        // 同步状态
+                        HorizontalLayout {
+                            Text {
+                                text: "状态";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                            Text {
+                                text: root.wallet_sync_status;
+                                font-size: 13px;
+                                color: root.wallet_sync_enabled ? Theme.neon-green : Theme.text-secondary;
+                            }
+                        }
+
+                        // 上次同步
+                        HorizontalLayout {
+                            Text {
+                                text: "上次同步";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                            Text {
+                                text: root.wallet_sync_last != "" ? root.wallet_sync_last : "—";
+                                font-size: 13px;
+                                color: Theme.text-primary;
+                            }
+                        }
+
+                        // 说明
+                        Text {
+                            text: "开启后，您的钱包余额和最近交易将通过 P2P 网络与已连接节点同步。其他节点可查询您的钱包公开信息。";
+                            font-size: 11px;
+                            color: Theme.text-secondary;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+
+                // 关于
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+
+                        Text {
+                            text: "关于";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        HorizontalLayout {
+                            Text {
+                                text: "版本";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            Text {
+                                text: "v0.1.0";
+                                font-size: 13px;
+                                color: Theme.text-primary;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            Text {
+                                text: "许可证";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            Text {
+                                text: "MIT";
+                                font-size: 13px;
+                                color: Theme.text-primary;
+                            }
+                        }
+
+                        Text {
+                            text: "© 2026 GeoYuan Foundation";
+                            font-size: 12px;
+                            color: Theme.text-secondary;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 验证页 - GyID 验证 + 二维码扫描
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "verify": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "wallet"; }
+                    }
+                    NavItem {
+                        nav_icon: "📷"; nav_label: "拍摄挖矿";
+                        on_clicked => { root.current_page = "photo"; }
+                    }
+                    NavItem {
+                        nav_icon: "🗺️"; nav_label: "探索";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史记录";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔐"; nav_label: "验证 GyID";
+                        on_clicked => { root.current_page = "verify"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔄"; nav_label: "转账";
+                        on_clicked => { root.current_page = "transfer"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容
+            VerticalLayout {
+                spacing: 16px;
+                horizontal-stretch: 1;
+
+                // 标题栏
+                HorizontalLayout {
+                    Text {
+                        text: "验证 GyID";
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: Theme.text-primary;
+                    }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    TouchArea {
+                        width: 120px;
+                        height: 36px;
+                        clicked => { root.current_page = "wallet"; }
+
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 8px;
+                            width: 100%;
+                            height: 100%;
+
+                            Text {
+                                text: "← 返回钱包";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 验证卡片
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.card-border;
+
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+
+                        Text {
+                            text: "输入 GyID 或扫描二维码";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                        }
+
+                        // 输入框
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: root.verify_valid ? Theme.neon-green : Theme.card-border;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 4px;
+
+                                Text {
+                                    text: "GyID";
+                                    font-size: 11px;
+                                    color: Theme.text-secondary;
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+
+                                    Text {
+                                        text: root.verify_input == "" ? "GyIDxxxx..." : root.verify_input;
+                                        font-size: 14px;
+                                        font-weight: 500;
+                                        color: root.verify_input == "" ? Theme.text-secondary : Theme.text-primary;
+                                        vertical-alignment: center;
+                                        wrap: word-wrap;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    if root.verify_valid:
+                                        Text {
+                                            text: "✓";
+                                            font-size: 16px;
+                                            color: Theme.neon-green;
+                                            vertical-alignment: center;
+                                        }
+                                }
+                            }
+                        }
+
+                        // 操作按钮行
+                        HorizontalLayout {
+                            spacing: 12px;
+
+                            // 粘贴按钮
+                            TouchArea {
+                                width: 100px;
+                                height: 40px;
+                                clicked => {
+                                    root.paste_gyid();
+                                }
+
+                                Rectangle {
+                                    background: Theme.input-bg;
+                                    border-radius: 8px;
+                                    border-width: 1px;
+                                    border-color: Theme.card-border;
+                                    width: 100%;
+                                    height: 100%;
+
+                                    Text {
+                                        text: "📋 粘贴";
+                                        font-size: 13px;
+                                        color: Theme.text-secondary;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 扫描二维码按钮
+                            TouchArea {
+                                width: 140px;
+                                height: 40px;
+                                clicked => { root.scan_qr_code(); }
+
+                                Rectangle {
+                                    background: Theme.input-bg;
+                                    border-radius: 8px;
+                                    border-width: 1px;
+                                    border-color: Theme.cyber-blue;
+                                    width: 100%;
+                                    height: 100%;
+
+                                    Text {
+                                        text: "📷 扫描二维码";
+                                        font-size: 13px;
+                                        color: Theme.cyber-blue;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 验证按钮
+                            TouchArea {
+                                width: 100px;
+                                height: 40px;
+                                clicked => { root.verify_gyid(root.verify_input); }
+
+                                Rectangle {
+                                    background: Theme.cyber-blue;
+                                    border-radius: 8px;
+                                    width: 100%;
+                                    height: 100%;
+
+                                    Text {
+                                        text: "验证";
+                                        font-size: 14px;
+                                        font-weight: 700;
+                                        color: Theme.deep-black;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 验证结果
+                        if root.verify_result != "":
+                            Rectangle {
+                                background: root.verify_valid ? #00FF8815 : #FF444415;
+                                border-radius: 12px;
+                                border-width: 1px;
+                                border-color: root.verify_valid ? Theme.neon-green : Theme.danger;
+
+                                VerticalLayout {
+                                    padding: 16px;
+                                    spacing: 12px;
+
+                                    HorizontalLayout {
+                                        Text {
+                                            text: root.verify_valid ? "✅ 验证通过" : "❌ 验证失败";
+                                            font-size: 16px;
+                                            font-weight: 700;
+                                            color: root.verify_valid ? Theme.neon-green : Theme.danger;
+                                        }
+
+                                        Rectangle { horizontal-stretch: 1; }
+
+                                        Text {
+                                            text: root.verify_valid ? "有效 GyID" : "无效格式";
+                                            font-size: 12px;
+                                            color: root.verify_valid ? Theme.neon-green : Theme.danger;
+                                        }
+                                    }
+
+                                    if root.verify_valid:
+                                        VerticalLayout {
+                                            spacing: 8px;
+
+                                            Text {
+                                                text: "哈希摘要 (前16字节)";
+                                                font-size: 11px;
+                                                color: Theme.text-secondary;
+                                            }
+
+                                            Text {
+                                                text: root.verify_hash;
+                                                font-size: 11px;
+                                                font-family: "Consolas";
+                                                color: Theme.cyber-blue;
+                                                wrap: word-wrap;
+                                            }
+
+                                            Rectangle { height: 8px; }
+
+                                            TouchArea {
+                                                width: 120px;
+                                                height: 32px;
+                                                clicked => { root.copy_gyid(root.verify_input); }
+
+                                                Rectangle {
+                                                    background: Theme.input-bg;
+                                                    border-radius: 6px;
+                                                    width: 100%;
+                                                    height: 100%;
+
+                                                    Text {
+                                                        text: "复制 GyID";
+                                                        font-size: 12px;
+                                                        color: Theme.text-secondary;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                }
+                            }
+                    }
+                }
+
+                // 二维码扫描说明
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "📷 二维码扫描";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        Text {
+                            text: "扫描 GyID 二维码可快速导入或验证身份。\n支持从相册选择图片或使用摄像头实时扫描。";
+                            font-size: 13px;
+                            color: Theme.text-secondary;
+                            wrap: word-wrap;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 12px;
+
+                            TouchArea {
+                                width: 140px;
+                                height: 40px;
+                                clicked => { root.scan_source = "gallery"; root.scan_qr_code(); }
+
+                                Rectangle {
+                                    background: root.scan_source == "gallery" ? Theme.cyber-blue : Theme.input-bg;
+                                    border-radius: 8px;
+                                    width: 100%;
+                                    height: 100%;
+
+                                    Text {
+                                        text: "从相册选择";
+                                        font-size: 13px;
+                                        color: root.scan_source == "gallery" ? Theme.deep-black : Theme.text-secondary;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            TouchArea {
+                                width: 140px;
+                                height: 40px;
+                                clicked => { root.scan_source = "camera"; root.scan_qr_code(); }
+
+                                Rectangle {
+                                    background: root.scan_source == "camera" ? Theme.cyber-blue : Theme.input-bg;
+                                    border-radius: 8px;
+                                    width: 100%;
+                                    height: 100%;
+
+                                    Text {
+                                        text: "摄像头扫描";
+                                        font-size: 13px;
+                                        color: root.scan_source == "camera" ? Theme.deep-black : Theme.text-secondary;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 成就页 - 游戏化核心
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "achievements": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "wallet"; }
+                    }
+                    NavItem {
+                        nav_icon: "📷"; nav_label: "拍摄挖矿";
+                        on_clicked => { root.current_page = "photo"; }
+                    }
+                    NavItem {
+                        nav_icon: "🗺️"; nav_label: "探索";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史记录";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔐"; nav_label: "验证 GyID";
+                        on_clicked => { root.current_page = "verify"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔄"; nav_label: "转账";
+                        on_clicked => { root.current_page = "transfer"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容
+            VerticalLayout {
+                spacing: 16px;
+                horizontal-stretch: 1;
+
+                // 标题栏
+                HorizontalLayout {
+                    Text {
+                        text: "🏆 成就";
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: Theme.text-primary;
+                    }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    Text {
+                        text: root.achievements_unlocked + "/" + root.achievements_total + " 已解锁";
+                        font-size: 14px;
+                        color: Theme.cyber-yellow;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // 能量条 + 排名
+                HorizontalLayout {
+                    spacing: 16px;
+
+                    // 能量卡片
+                    Rectangle {
+                        background: Theme.card-bg;
+                        border-radius: 12px;
+                        horizontal-stretch: 1;
+
+                        EnergyBar {
+                            current: root.energy;
+                            max: root.energy_max;
+                        }
+                    }
+
+                    // 排名卡片
+                    Rectangle {
+                        background: Theme.card-bg;
+                        border-radius: 12px;
+                        width: 200px;
+
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 4px;
+
+                            Text {
+                                text: "📊 贡献排名";
+                                font-size: 12px;
+                                color: Theme.text-secondary;
+                            }
+
+                            Text {
+                                text: "#" + root.rank;
+                                font-size: 28px;
+                                font-weight: 900;
+                                color: Theme.cyber-blue;
+                            }
+
+                            Text {
+                                text: "全球社区";
+                                font-size: 11px;
+                                color: Theme.text-secondary;
+                            }
+                        }
+                    }
+                }
+
+                // 成就列表
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+                        // 已解锁成就区域
+                        VerticalLayout {
+                            spacing: 8px;
+
+                            Text {
+                                text: "✨ 已解锁";
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: Theme.cyber-yellow;
+                            }
+
+                            // 成就网格
+                            VerticalLayout {
+                                spacing: 12px;
+
+                                HorizontalLayout {
+                                    spacing: 12px;
+
+                                    AchievementBadge {
+                                        icon: "🎉";
+                                        name: "初次见面";
+                                        desc: "完成首次 GyID 铸造";
+                                        unlocked: true;
+                                        progress: 1.0;
+                                    }
+
+                                    AchievementBadge {
+                                        icon: "🔥";
+                                        name: "坚持不懈";
+                                        desc: "连续7天铸造 GyID";
+                                        unlocked: false;
+                                        progress: 0.43;
+                                    }
+
+                                    AchievementBadge {
+                                        icon: "🌍";
+                                        name: "探索者";
+                                        desc: "在2个以上城市铸造";
+                                        unlocked: false;
+                                        progress: 0.5;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 12px;
+
+                                    AchievementBadge {
+                                        icon: "🗃️";
+                                        name: "收藏家";
+                                        desc: "铸造10个 GyID";
+                                        unlocked: false;
+                                        progress: 0.2;
+                                    }
+
+                                    AchievementBadge {
+                                        icon: "🎖️";
+                                        name: "老兵";
+                                        desc: "铸造100个 GyID";
+                                        unlocked: false;
+                                        progress: 0.02;
+                                    }
+
+                                    AchievementBadge {
+                                        icon: "🌅";
+                                        name: "早起鸟";
+                                        desc: "在凌晨5-7点铸造";
+                                        unlocked: false;
+                                        progress: 0.0;
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 16px; }
+
+                        // 锁定成就区域
+                        VerticalLayout {
+                            spacing: 8px;
+
+                            Text {
+                                text: "🔒 待解锁";
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: Theme.text-secondary;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 12px;
+
+                                AchievementBadge {
+                                    icon: "🦉";
+                                    name: "夜猫子";
+                                    desc: "在凌晨0-5点铸造";
+                                    unlocked: false;
+                                    progress: 0.0;
+                                }
+
+                                AchievementBadge {
+                                    icon: "✈️";
+                                    name: "旅行者";
+                                    desc: "在10个城市铸造";
+                                    unlocked: false;
+                                    progress: 0.1;
+                                }
+
+                                AchievementBadge {
+                                    icon: "💰";
+                                    name: "富翁";
+                                    desc: "持有100 GY";
+                                    unlocked: false;
+                                    progress: 0.02;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 每日任务
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+                        HorizontalLayout {
+                            Text {
+                                text: "📋 每日任务";
+                                font-size: 16px;
+                                font-weight: 600;
+                                color: Theme.text-primary;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            Text {
+                                text: "+25 ⚡ 可领取";
+                                font-size: 12px;
+                                color: Theme.cyber-yellow;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        TaskItem {
+                            icon: "🪙";
+                            name: "每日铸造";
+                            desc: "今日铸造至少1个 GyID";
+                            reward: 10.0;
+                            completed: false;
+                            progress: 0.0;
+                        }
+
+                        TaskItem {
+                            icon: "🔗";
+                            name: "分享传播";
+                            desc: "分享 GyID 给好友";
+                            reward: 5.0;
+                            completed: true;
+                            progress: 1.0;
+                        }
+
+                        TaskItem {
+                            icon: "🔍";
+                            name: "验证达人";
+                            desc: "验证3个其他 GyID";
+                            reward: 8.0;
+                            completed: false;
+                            progress: 0.33;
+                        }
+
+                        TaskItem {
+                            icon: "🏠";
+                            name: "每日登录";
+                            desc: "每日首次打开应用";
+                            reward: 2.0;
+                            completed: true;
+                            progress: 1.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 探索页 - 地图探索与位置记录
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "explore": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "wallet"; }
+                    }
+                    NavItem {
+                        nav_icon: "📷"; nav_label: "拍摄挖矿";
+                        on_clicked => { root.current_page = "photo"; }
+                    }
+                    NavItem {
+                        nav_icon: "🗺️"; nav_label: "探索";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史记录";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔐"; nav_label: "验证 GyID";
+                        on_clicked => { root.current_page = "verify"; }
+                    }
+                    NavItem {
+                        nav_icon: "🔄"; nav_label: "转账";
+                        on_clicked => { root.current_page = "transfer"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容
+            VerticalLayout {
+                spacing: 16px;
+                horizontal-stretch: 1;
+
+                // 标题栏
+                HorizontalLayout {
+                    Text {
+                        text: "🗺️ 位置探索";
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: Theme.text-primary;
+                    }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    TouchArea {
+                        width: 120px;
+                        height: 36px;
+                        clicked => { root.current_page = "wallet"; }
+
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 8px;
+                            width: 100%;
+                            height: 100%;
+
+                            Text {
+                                text: "← 返回钱包";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 统计概览
+                HorizontalLayout {
+                    spacing: 16px;
+
+                    // 位置统计卡片
+                    Rectangle {
+                        background: Theme.card-bg;
+                        border-radius: 12px;
+                        horizontal-stretch: 1;
+
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 8px;
+
+                            Text {
+                                text: "📍 探索位置";
+                                font-size: 12px;
+                                color: Theme.text-secondary;
+                            }
+
+                            Text {
+                                text: root.total_locations;
+                                font-size: 32px;
+                                font-weight: 900;
+                                color: Theme.cyber-blue;
+                            }
+
+                            Text {
+                                text: "个城市/地区";
+                                font-size: 11px;
+                                color: Theme.text-secondary;
+                            }
+                        }
+                    }
+
+                    // GyID 统计卡片
+                    Rectangle {
+                        background: Theme.card-bg;
+                        border-radius: 12px;
+                        horizontal-stretch: 1;
+
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 8px;
+
+                            Text {
+                                text: "🆔 铸造 GyID";
+                                font-size: 12px;
+                                color: Theme.text-secondary;
+                            }
+
+                            Text {
+                                text: root.total_gyids;
+                                font-size: 32px;
+                                font-weight: 900;
+                                color: Theme.neon-green;
+                            }
+
+                            Text {
+                                text: "枚身份";
+                                font-size: 11px;
+                                color: Theme.text-secondary;
+                            }
+                        }
+                    }
+
+                    // 覆盖率卡片
+                    Rectangle {
+                        background: Theme.card-bg;
+                        border-radius: 12px;
+                        horizontal-stretch: 1;
+
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 8px;
+
+                            Text {
+                                text: "🌐 覆盖率";
+                                font-size: 12px;
+                                color: Theme.text-secondary;
+                            }
+
+                            Text {
+                                text: root.coverage_text;
+                                font-size: 32px;
+                                font-weight: 900;
+                                color: Theme.cyber-magenta;
+                            }
+
+                            Text {
+                                text: "全球地理";
+                                font-size: 11px;
+                                color: Theme.text-secondary;
+                            }
+                        }
+                    }
+                }
+
+                // 世界地图区域（简化版）
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    height: 280px;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 16px;
+
+                        Text {
+                            text: "🌍 GyID 地理分布";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        // 地图区域（简化版，使用网格模拟）
+                        Rectangle {
+                            background: Theme.input-bg;
+                            border-radius: 12px;
+                            height: 180px;
+
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 12px;
+
+                                // 亚洲区域
+                                HorizontalLayout {
+                                    spacing: 12px;
+
+                                    MapMarker {
+                                        city: "深圳";
+                                        country: "中国";
+                                        count: 1;
+                                        lat: 22.5431;
+                                        lon: 114.0579;
+                                        is_active: root.selected_city == "深圳";
+                                    }
+
+                                    MapMarker {
+                                        city: "北京";
+                                        country: "中国";
+                                        count: 1;
+                                        lat: 39.9042;
+                                        lon: 116.4074;
+                                        is_active: root.selected_city == "北京";
+                                    }
+                                }
+
+                                // 其他区域占位
+                                HorizontalLayout {
+                                    spacing: 12px;
+
+                                    MapMarker {
+                                        city: "纽约";
+                                        country: "美国";
+                                        count: 0;
+                                        lat: 40.7128;
+                                        lon: -74.0060;
+                                        is_active: false;
+                                    }
+
+                                    MapMarker {
+                                        city: "东京";
+                                        country: "日本";
+                                        count: 0;
+                                        lat: 35.6762;
+                                        lon: 139.6503;
+                                        is_active: false;
+                                    }
+
+                                    MapMarker {
+                                        city: "伦敦";
+                                        country: "英国";
+                                        count: 0;
+                                        lat: 51.5074;
+                                        lon: -0.1278;
+                                        is_active: false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 位置列表
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "📜 位置记录";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        VerticalLayout {
+                            spacing: 10px;
+
+                            LocationCard {
+                                gyid: root.gy_id != "" ? root.gy_id : "GyIDxxx...";
+                                city: "深圳市南山区";
+                                address: "科技园附近";
+                                time: "刚刚";
+                                lat: 22.5431;
+                                lon: 114.0579;
+                            }
+
+                            LocationCard {
+                                gyid: "GyIDxxx...";
+                                city: "北京市朝阳区";
+                                address: "国贸附近";
+                                time: "昨天";
+                                lat: 39.9042;
+                                lon: 116.4074;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 钱包页
+    // ═══════════════════════════════════════════════════════════
+    if root.current_page == "wallet": Rectangle {
+        background: Theme.deep-black;
+
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 16px;
+
+            // 侧边栏
+            Rectangle {
+                background: Theme.card-bg;
+                border-radius: 16px;
+                width: 220px;
+
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: "GeoYuan";
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: Theme.cyber-blue;
+                    }
+
+                    Rectangle { height: 16px; }
+
+                    NavItem {
+                        nav_icon: "🏠"; nav_label: "首页";
+                        on_clicked => { root.current_page = "explore"; }
+                    }
+                    NavItem {
+                        nav_icon: "💰"; nav_label: "钱包 (当前)";
+                    }
+                    NavItem {
+                        nav_icon: "📜"; nav_label: "历史";
+                        on_clicked => { root.current_page = "history"; }
+                    }
+                    NavItem {
+                        nav_icon: "🏆"; nav_label: "成就";
+                        on_clicked => { root.current_page = "achievements"; }
+                    }
+                    NavItem {
+                        nav_icon: "⚙️"; nav_label: "设置";
+                        on_clicked => { root.current_page = "settings"; }
+                    }
+                }
+            }
+
+            // 主内容区
+            VerticalLayout {
+                spacing: 16px;
+                vertical-stretch: 1;
+
+                // 顶部栏
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    height: 70px;
+
+                    HorizontalLayout {
+                        padding: 20px;
+                        alignment: space-between;
+
+                        Text {
+                            text: "💰 我的钱包";
+                            font-size: 24px;
+                            font-weight: 700;
+                            color: Theme.text-primary;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 12px;
+
+                            CyberButtonOutline {
+                                label: "转账";
+                                clicked => { root.current_page = "transfer"; }
+                            }
+                        }
+                    }
+                }
+
+                // 余额卡片
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    height: 180px;
+
+                    VerticalLayout {
+                        padding: 32px;
+                        spacing: 16px;
+                        alignment: center;
+
+                        Text {
+                            text: "GY 余额";
+                            font-size: 16px;
+                            color: Theme.text-secondary;
+                        }
+
+                        Text {
+                            text: root.gy_balance + " GY";
+                            font-size: 56px;
+                            font-weight: 900;
+                            color: Theme.neon-green;
+                        }
+
+                        Text {
+                            text: "≈ ¥" + (root.gy_balance.to-float() * 10) + " CNY";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                        }
+                    }
+                }
+
+                // 钱包地址
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "🔗 钱包地址";
+                            font-size: 14px;
+                            color: Theme.text-secondary;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 12px;
+
+                            Rectangle {
+                                background: Theme.input-bg;
+                                border-radius: 8px;
+                                height: 44px;
+                                horizontal-stretch: 1;
+
+                                HorizontalLayout {
+                                    padding: 12px;
+
+                            Text {
+                                text: root.wallet_address;
+                                font-size: 14px;
+                                font-family: "monospace";
+                                color: Theme.text-primary;
+                            }
+                                }
+                            }
+
+                            CyberButtonOutline {
+                                label: "复制";
+                                clicked => { root.copy_gyid(root.wallet_address); }
+                            }
+                        }
+                    }
+                }
+
+                // 最近交易
+                Rectangle {
+                    background: Theme.card-bg;
+                    border-radius: 16px;
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "📜 最近交易";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: Theme.text-primary;
+                        }
+
+                        VerticalLayout {
+                            spacing: 8px;
+
+                            if root.wallet_tx1_title != "" : TransactionItem {
+                                tx_icon: root.wallet_tx1_icon;
+                                tx_title: root.wallet_tx1_title;
+                                tx_amount: root.wallet_tx1_amount;
+                                tx_time: root.wallet_tx1_time;
+                                tx_status: root.wallet_tx1_status;
+                            }
+
+                            if root.wallet_tx2_title != "" : TransactionItem {
+                                tx_icon: root.wallet_tx2_icon;
+                                tx_title: root.wallet_tx2_title;
+                                tx_amount: root.wallet_tx2_amount;
+                                tx_time: root.wallet_tx2_time;
+                                tx_status: root.wallet_tx2_status;
+                            }
+
+                            if root.wallet_tx1_title == "" : Text {
+                                text: "暂无交易记录";
+                                font-size: 13px;
+                                color: Theme.text-secondary;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

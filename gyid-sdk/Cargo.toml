@@ -1,0 +1,94 @@
+[package]
+name = "gyid-sdk"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "GyID SDK - Cross-platform identity SDK for Web, Android, iOS"
+
+[lib]
+name = "gyid_sdk"
+crate-type = [
+    "cdylib",    # C 动态库 (Android JNI / iOS / FFI)
+    "rlib",      # Rust 库 (其他 Rust crate 使用)
+    "staticlib", # 静态库 (iOS .a 文件)
+]
+
+[features]
+default = ["native"]
+# 原生平台 (Windows/macOS/Linux)
+native = ["gyid-core/native"]
+# WASM 目标：Web 端支持（不含 native）
+wasm = [
+    "wasm-bindgen",
+    "js-sys",
+    "web-sys",
+    "getrandom/js",
+    "wasm-bindgen-futures",
+    "console_error_panic_hook",
+    "gyid-core/wasm",
+]
+# Android JNI 支持
+android = ["jni", "gyid-core/native"]
+# UniFFI 多语言绑定 (iOS Swift / Kotlin)
+uniffi-bindings = ["uniffi"]
+# 完整签名 (链上)
+chain-signing = ["gyid-core/chain-signing"]
+
+[dependencies]
+gyid-core = { path = "../gyid-core", default-features = false }
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 错误处理
+thiserror = "1.0"
+anyhow = "1.0"
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
+# 临时文件（用于头像处理，非 WASM）
+tempfile = "3.10"
+
+# 系统路径（非 WASM）
+dirs = "5.0"
+
+# WASM 相关（可选，通过 wasm feature 或 target cfg 引入）
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", features = [
+    "console",
+    "Navigator",
+    "Window",
+    "Screen",
+], optional = true }
+getrandom = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# Android JNI
+jni = { version = "0.21", default-features = false, optional = true }
+
+# UniFFI (Swift/Kotlin 多语言绑定)
+uniffi = { version = "0.28", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.36", features = ["full"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+tokio = { version = "1.36", features = ["full"] }

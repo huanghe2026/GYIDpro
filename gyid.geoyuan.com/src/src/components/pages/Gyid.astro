@@ -1,0 +1,106 @@
+---
+import { pages } from '../../i18n/content';
+interface Props {
+  locale: 'en' | 'zh';
+}
+const { locale } = Astro.props;
+const t = pages[locale].gyid;
+---
+
+<!-- HERO -->
+<section class="py-24 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto text-center fade-in-up">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.hero.badge}</div>
+    <h1 class="font-orbitron font-black text-4xl md:text-5xl text-cyber-text">{t.hero.title}</h1>
+    <p class="neon-cyan font-orbitron text-lg md:text-xl mt-3">{t.hero.subtitle}</p>
+    <p class="section-subtitle mx-auto text-center mt-6">{t.hero.desc}</p>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="py-20 px-4 sm:px-6" style="background: rgba(0,0,0,0.25);">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-14">
+      <div class="cyber-badge mb-4 mx-auto inline-flex">{t.how.badge}</div>
+      <h2 class="section-title font-orbitron">{t.how.title}</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {
+        t.how.steps.map((s) => (
+          <div class="cyber-card p-6 text-center">
+            <div class="font-orbitron font-black text-4xl neon-magenta mb-3">{s.n}</div>
+            <h3 class="font-orbitron font-bold text-lg text-cyber-text mb-2">{s.title}</h3>
+            <p class="text-cyber-text-dim text-sm leading-relaxed">{s.desc}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- PROPS -->
+<section class="py-20 px-4 sm:px-6">
+  <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    {
+      t.props.map((p) => (
+        <div class="cyber-card cyber-corner p-6">
+          <h3 class="font-orbitron font-bold text-base text-cyber-cyan mb-2">{p.title}</h3>
+          <p class="text-cyber-text-dim text-sm leading-relaxed">{p.desc}</p>
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<!-- H3 -->
+<section class="py-20 px-4 sm:px-6" style="background: rgba(0,0,0,0.25);">
+  <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+    <div>
+      <div class="cyber-badge mb-4 inline-flex">{t.h3.badge}</div>
+      <h2 class="section-title font-orbitron mb-4">{t.h3.title}</h2>
+      <p class="text-cyber-text-dim leading-relaxed mb-6">{t.h3.desc}</p>
+      <a href={t.h3.docBtn.href} class="btn-cyber-outline">{t.h3.docBtn.label}</a>
+    </div>
+    <div>
+      <div class="text-6xl neon-cyan mb-6">{t.h3.icon}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {
+          t.h3.levels.map((l) => (
+            <div class="stat-box">
+              <div class="font-orbitron font-bold text-cyber-text mb-1">{l.name}</div>
+              <div class="font-mono text-xs text-cyber-cyan">{l.res}</div>
+              <div class="font-mono text-xs text-cyber-text-dim mt-1">{l.area}</div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FORMAT -->
+<section class="py-20 px-4 sm:px-6">
+  <div class="max-w-4xl mx-auto text-center">
+    <div class="cyber-badge mb-6 mx-auto inline-flex">{t.format.badge}</div>
+    <h2 class="section-title font-orbitron mb-8">{t.format.title}</h2>
+    <div class="cyber-card cyber-corner p-6 mb-8">
+      <div class="font-mono text-lg md:text-2xl neon-cyan break-all">{t.format.example}</div>
+      <div class="font-mono text-xs text-cyber-text-dim mt-2">{t.format.note}</div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      {
+        t.format.parts.map((p) => (
+          <div class="stat-box text-left">
+            <div class="font-mono text-cyber-cyan text-sm mb-1">{p.part}</div>
+            <div class="font-orbitron font-bold text-cyber-text text-sm">{p.title}</div>
+            <div class="text-cyber-text-dim text-xs mt-1 leading-relaxed">{p.desc}</div>
+          </div>
+        ))
+      }
+    </div>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href={t.format.primaryBtn.href} class="btn-cyber">{t.format.primaryBtn.label}</a>
+      <a href={t.format.secondaryBtn.href} class="btn-cyber-outline">{t.format.secondaryBtn.label}</a>
+    </div>
+  </div>
+</section>

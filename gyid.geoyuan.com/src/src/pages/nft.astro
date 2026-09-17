@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nft from '../components/pages/Nft.astro';
+import { pages } from '../i18n/content';
+const locale = 'en';
+---
+<Layout locale={locale} path="/nft" title="NFT Applications — Geoyuan" description={pages.en.nft.hero.desc}>
+  <Nft locale={locale} />
+</Layout>
