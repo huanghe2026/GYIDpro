@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 骨架用 vector 图标，避免二进制 PNG；正式发布再换 adaptive icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="@color/ic_launcher_background"
+        android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,8 L38,16 L38,28 C38,35 31,39 24,42 C17,39 10,35 10,28 L10,16 Z" />
+    <path
+        android:fillColor="@color/ic_launcher_background"
+        android:pathData="M20,30 l-5,-5 l2.8,-2.8 L20,24.4 l10.2,-10.2 L33,17 Z" />
+</vector>

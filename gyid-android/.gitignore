@@ -1,0 +1,15 @@
+# Android / Gradle
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+
+# Rust / UniFFI 构建产物（.so 由 cargo ndk 生成，Kotlin 绑定是生成代码但需入库供无 Rust 环境构建）
+*.apk
+*.aab

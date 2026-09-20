@@ -14,6 +14,7 @@ use trip_core::engine::hamiltonian::evaluate as hamiltonian_evaluate;
 use trip_core::engine::levy::fit as levy_fit;
 use trip_core::engine::psd::{displacements_from_cells, psd_alpha};
 use trip_core::engine::trust::{alpha_in_bio_range, trust_score, TrustInput};
+use trip_core::tit::{Tit, TitClaims};
 use trip_core::{Breadcrumb, PohCertificate, ProtocolKey, TripError};
 
 /// PSD/Levy 评估窗口（面包屑条数；草案高风险决策上限 256）。
@@ -145,6 +146,32 @@ pub fn issue_poh(
         validity_secs,
         rp_nonce,
         eval.chain_head,
+    )
+}
+
+/// 基于评估结果签发 **Verifier 背书**的 TIT（GYIP-0003 §5.4）。
+///
+/// 与 PoH 的分工：PoH 绑定一次性 RP nonce 且携带完整统计指数；TIT 长期
+/// 有效、可放进二维码/DID Document，用于展示与发现。两者都由 Verifier
+/// 长密钥签名，RP 用同一份 `/.well-known/verifier.json` 公钥验签。
+pub fn issue_tit(
+    verifier: &ProtocolKey,
+    attester: [u8; 32],
+    eval: &EvalResult,
+    issued_at: u64,
+    validity_secs: u64,
+) -> Tit {
+    Tit::issue_verifier_signed(
+        verifier,
+        TitClaims {
+            identity: attester,
+            epochs: eval.epoch_count,
+            breadcrumbs: eval.breadcrumb_count,
+            unique_cells: eval.unique_cells,
+            trust: eval.trust,
+            issued_at,
+            validity_secs,
+        },
     )
 }
 

@@ -210,20 +210,25 @@ async fn verify_and_issue(
         .await
         .map_err(|e| ServerError::Internal(e.to_string()))??;
 
-    // 5) 落库：PoH 待 RP 取，挑战置 Issued。
-    state
-        .inner
-        .poh
-        .write()
-        .await
-        .insert(response.challenge_id, cert_cbor);
-    state
-        .inner
-        .challenges
-        .write()
-        .await
-        .entry(response.challenge_id)
-        .and_modify(|r| r.status = ChallengeStatus::Issued);
+    // 5) 落库：PoH 待 RP 取，挑战置 Issued；同时记入 attester 的 PoH 列表。
+    {
+        let mut poh = state.inner.poh.write().await;
+        poh.insert(response.challenge_id, cert_cbor);
+        // 不在锁内跨 await：先解锁 poh，再写 challenges 和 attester_pohs。
+    }
+    {
+        let mut challenges = state.inner.challenges.write().await;
+        challenges
+            .entry(response.challenge_id)
+            .and_modify(|r| r.status = ChallengeStatus::Issued);
+    }
+    {
+        let mut attester_pohs = state.inner.attester_pohs.write().await;
+        attester_pohs
+            .entry(*attester)
+            .or_default()
+            .push(response.challenge_id);
+    }
 
     Ok((response.challenge_id, eval, policy_ok))
 }

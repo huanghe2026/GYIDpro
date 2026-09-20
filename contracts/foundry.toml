@@ -1,0 +1,20 @@
+# GeoTITRegistry — Foundry 配置
+#
+# evm_version = "paris"：刻意保守。合约不使用 Cancun/Shanghai 新指令
+# （TSTORE / MCOPY / PUSH0 都不要），换来对老节点与内存 EVM（ganache 等）
+# 的最大兼容性；代价只是少量 gas。
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+libs = ["lib"]
+solc = "0.8.37"
+evm_version = "paris"
+optimizer = true
+optimizer_runs = 200
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false
+int_types = "long"

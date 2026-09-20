@@ -1,14 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "geoyuan-core",
-    "geoyuan-cli",
-    "geoyuan-gui",
-    "gyid-core",
-    "gyid-gui",
     "trip-core",
     "trip-cli",
     "trip-server",
+    "gyid-shared",
+    "gyid-wasm",
+    "gyid-android-rs",
 ]
 
 [workspace.package]

@@ -1,9 +1,0 @@
----
-import Layout from '../../layouts/Layout.astro';
-import About from '../../components/pages/About.astro';
-import { pages } from '../../i18n/content';
-const locale = 'zh';
----
-<Layout locale={locale} path="/zh/about" title="关于地理元 — 地理元" description={pages.zh.about.hero.subtitle}>
-  <About locale={locale} />
-</Layout>

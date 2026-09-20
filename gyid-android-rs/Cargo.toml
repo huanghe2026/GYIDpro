@@ -1,0 +1,27 @@
+[package]
+name = "gyid-android-rs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "GyID UniFFI bridge — Rust core exposed to Kotlin/Android"
+
+[lib]
+name = "gyid_android_rs"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+gyid-shared = { path = "../gyid-shared", features = ["encrypt", "http-client"] }
+trip-core = { path = "../trip-core" }
+hex = { workspace = true }
+h3o = "0.7"
+thiserror = { workspace = true }
+uniffi = "0.28"
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }
+
+[dev-dependencies]
+# bindgen CLI：cargo run --example uniffi-bindgen -- generate ...
+# 仅 dev profile 启用，不会编进 Android .so
+uniffi = { version = "0.28", features = ["cli"] }

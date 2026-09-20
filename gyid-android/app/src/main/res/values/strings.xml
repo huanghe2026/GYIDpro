@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GyID</string>
+    <string name="collect_channel_name">面包屑采集</string>
+    <string name="collect_notification_title">GyID 正在采集位置证明</string>
+</resources>

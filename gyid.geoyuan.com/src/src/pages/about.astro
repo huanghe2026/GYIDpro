@@ -1,9 +1,0 @@
----
-import Layout from '../layouts/Layout.astro';
-import About from '../components/pages/About.astro';
-import { pages } from '../i18n/content';
-const locale = 'en';
----
-<Layout locale={locale} path="/about" title="About Geoyuan — Geoyuan" description={pages.en.about.hero.subtitle}>
-  <About locale={locale} />
-</Layout>

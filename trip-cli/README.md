@@ -1,13 +1,15 @@
-# trip-cli — TRIP 协议命令行工具
+# gyid — GyID 命令行工具
 
-`draft-ayerbe-trip-protocol-04` 的命令行实现。封装 `trip-core` 的全部能力：
-密钥生成、面包屑签名/验签、链验证、Epoch 封装、PoH 证书签发/验签、端到端仿真。
+`draft-ayerbe-trip-protocol-04` 的命令行实现，二进制名为 `gyid`。提供两类命令：
+
+- **用户命令**：身份创建、面包屑采集、Active Verification、PoH 查询
+- **高级命令**（协议开发者）：密钥、面包屑、链、Epoch、PoH 原始签发/验签、仿真
 
 ## 构建
 
 ```bash
 cargo build --release -p trip-cli
-# 二进制位于 target/release/trip-cli
+# 二进制位于 target/release/gyid
 ```
 
 或直接通过 `cargo run`：
@@ -16,131 +18,103 @@ cargo build --release -p trip-cli
 cargo run --release -p trip-cli -- <command>
 ```
 
-## 命令一览
+## 用户命令
 
 | 命令 | 说明 |
 |------|------|
-| `trip keygen` | 生成 Ed25519 密钥对（seed + pubkey） |
-| `trip breadcrumb sign` | 签名一条面包屑 |
-| `trip breadcrumb verify` | 验证面包屑签名 |
-| `trip chain <file>` | 验证面包屑链 |
-| `trip epoch seal` | 从面包屑封装 epoch |
-| `trip epoch verify` | 验证 epoch 签名 + Merkle 覆盖 |
-| `trip poh issue` | 签发 PoH 证书（Verifier 侧） |
-| `trip poh verify` | 验证 PoH 证书（RP 侧） |
-| `trip simulate` | 端到端仿真（轨迹→面包屑→画像→PoH） |
+| `gyid init` | 生成新 GyID 身份（输出 seed + pubkey） |
+| `gyid collect` | daemon 模式持续采集面包屑并上传 Verifier |
+| `gyid verify` | RP 发起 Active Verification 并取回 PoH |
+| `gyid poh-list` | 列出某 attester 已签发的 PoH |
+| `gyid poh-show` | pretty-print PoH 证书全部字段 |
 
-## 数据格式
+### 1. 创建身份
 
-- **面包屑**：hex 编码的确定性 CBOR，stdout 输出
+```bash
+$ gyid init
+seed    = 072fbf79eecc79216f7ae1503d686a1b214ba258291b387e1e36e44e24f7a55c
+pubkey  = e79799f9ddeff4f59344ba0fc3575e031f4ea83f101aaa9982bfe1d24cc2cd2b
+✓ 身份已创建，请保管好 seed
+```
+
+### 2. 持续采集面包屑
+
+```bash
+gyid collect --verifier http://localhost:8080 \
+             --seed 072fbf79... \
+             --interval 900
+```
+
+启动时自动从 Verifier 拉取当前链状态（index / chain_head / last_ts），按间隔
+持续采集 → H3 res-10 量化 → Ed25519 签名 → 上传。Ctrl-C 停止。
+
+> **GPS 说明**：桌面 Linux 通常无 GPS 硬件，`collect` 会提示无法定位并退出。
+> 移动设备/嵌入式平台可在 `get_location()` 接入 geoclue2 / Android
+> LocationManager / NMEA 串口。开发测试可用 `gyid-shared` 的
+> `examples/seed_chain.rs` 生成合规链夹具。
+
+### 3. 发起 Active Verification（RP 角色）
+
+```bash
+gyid verify --verifier http://localhost:8080 \
+            --attester e79799f9... \
+            # --rp-nonce 00112233...   # 不传则随机生成
+```
+
+流程：POST /v1/verify → 提示在 Attester 端签名（CLI 无法自动签名）→
+轮询 POST /v1/poh（Pending 时 1s 重试）→ 取回 PoH → 本地 verify_poh
+校验 Verifier 签名 + nonce 新鲜性 + 策略门槛 → 打印结果。
+
+PoH hex 从 stdout 输出（可管道保存），人类可读信息走 stderr。
+
+### 4. 列出 PoH
+
+```bash
+$ gyid poh-list --verifier http://localhost:8080 --attester e79799f9...
+Attester: e79799f9...
+已签发 PoH: 3 张
+  [0] a1b2c3d4...
+  [1] e5f6a7b8...
+```
+
+### 5. 查看 PoH 证书字段
+
+```bash
+gyid poh-show <poh_hex_cbor>
+```
+
+打印 identity / issued_at / alpha / beta / kappa / pi / confidence / trust /
+unique_cells / breadcrumb_count / validity / nonce / chain_head / signature，
+并给出 `meets_policy(0.1, 20.0)` 结论。
+
+---
+
+## Advanced（协议开发者命令）
+
+| 命令 | 说明 |
+|------|------|
+| `gyid keygen` | 生成 Ed25519 密钥对（seed + pubkey） |
+| `gyid breadcrumb sign` | 签名一条面包屑 |
+| `gyid breadcrumb verify` | 验证面包屑签名 |
+| `gyid chain <file>` | 验证面包屑链 |
+| `gyid epoch seal` | 从面包屑封装 epoch |
+| `gyid epoch verify` | 验证 epoch 签名 + Merkle 覆盖 |
+| `gyid poh issue` | 签发 PoH 证书（Verifier 侧） |
+| `gyid poh verify` | 验证 PoH 证书（RP 侧，带门槛） |
+| `gyid simulate` | 端到端仿真（轨迹→面包屑→画像→PoH） |
+
+高级命令示例与原 trip-cli 相同，详见 Git 历史。
+
+## 数据格式约定
+
+- **面包屑 / Epoch / PoH**：hex 编码的确定性 CBOR
 - **链文件**：每行一条 hex CBOR 面包屑（支持空行）
-- **Epoch/PoH**：hex 编码 CBOR
-- **密钥 seed**：64 个 hex 字符（32 字节）
-- **block_hash/pubkey**：输出到 stderr，不干扰 stdout 管道
-
-## 使用示例
-
-### 1. 生成密钥
-
-```bash
-$ trip keygen
-seed     = 072fbf79eecc79216f7ae1503d686a1b214ba258291b387e1e36e44e24f7a55c
-pubkey   = e79799f9ddeff4f59344ba0fc3575e031f4ea83f101aaa9982bfe1d24cc2cd2b
-# 保管 seed，它是你的身份私钥。pubkey 可公开。
-```
-
-### 2. 签名面包屑并构建链
-
-```bash
-SEED="2a2a2a...2a"  # 64 hex chars
-
-# 创世面包屑（无 prev_hash）
-BC0=$(trip breadcrumb sign --seed $SEED --index 0 --timestamp 1700000000 --cell 1000 --resolution 10 2>/dev/null)
-# stderr: block_hash = <hash0>
-
-# 第二条（prev = hash0）
-BC1=$(trip breadcrumb sign --seed $SEED --index 1 --timestamp 1700000900 --cell 1001 --prev <hash0> 2>/dev/null)
-
-# 写入链文件
-echo -e "$BC0\n$BC1" > chain.hex
-```
-
-### 3. 验证链
-
-```bash
-$ trip chain chain.hex
-验证 2 条面包屑…… OK
-index 范围: 0..=1
-身份公钥: 197f6b23e16c8532c6abc838facd5ea789be0c76b2920334029bfa8b3d368d61
-链头哈希: 2c2a30f125bdc42b5c6f64005df5ea7923929f646eb69c2fbdffabee63f8ae82
-```
-
-### 4. 封装 Epoch
-
-```bash
-$ cat chain.hex | trip epoch seal --seed $SEED --number 0
-a90000015820197f6b23e...
-epoch 0  index 0..=1  unique_cells=2  merkle=a8aa7a190624fb28...
-```
-
-### 5. 验证 Epoch
-
-```bash
-$ trip epoch verify <epoch_hex> chain.hex
-验证 epoch 0 签名…… OK
-验证 Merkle 覆盖…… OK
-```
-
-### 6. 签发 PoH 证书
-
-```bash
-$ trip poh issue \
-    --verifier-seed <verifier_seed> \
-    --identity <pubkey_hex> \
-    --alpha 0.59 --beta 1.72 --kappa 5.0 \
-    --confidence 0.15 --trust 80.0 \
-    --unique-cells 3 --breadcrumb-count 3 \
-    --chain-head <chain_head_hex>
-af005820197f6b23e...
-PoH 证书已签发（236 字节 CBOR）
-```
-
-### 7. 验证 PoH 证书
-
-```bash
-$ trip poh verify <poh_hex> \
-    --verifier-pubkey <verifier_pubkey_hex> \
-    --nonce 000102030405060708090a0b0c0d0e0f \
-    --now 1700256001
-验签 + 新鲜性…… OK
-策略检查…… PASS
-α=0.5900  confidence=0.1500  trust=80.00  unique=3  crumbs=3
-```
-
-### 8. 端到端仿真
-
-```bash
-$ trip simulate --seed 2024 --count 512
-=== TRIP 仿真（seed=2024, crumbs=512）===
-面包屑链:  513 条,  unique cells: 407
-PSD:       α = 0.6147  (R² = 0.1780, class = pink)
-Levy MLE:  β = 3.0000  κ = 75.5888
-Hamiltonian: H = 3.1765  (alert = suspicious, baseline = -2.5499)
-  spatial=1.582  temporal=6.217  kinetic=6.908  flock=0.373  contextual=0.000  structure=1.000
-Trust:     T = 80.05  (α∈bio = true, handle_eligible = true)
-PoH:       236 字节 CBOR
-RP 验签:   signature OK, confidence = 0.1319, policy = PASS
-
-=== PASS ===
-```
-
-## 设计约定
-
-- **stdout 只输出机器可读数据**（hex CBOR），便于管道拼接
-- **stderr 输出人类可读信息**（block_hash、pubkey、进度、统计）
+- **密钥 seed**：64 hex 字符（32 字节）；**RP nonce**：32 hex 字符（16 字节）
+- **stdout** 只输出机器可读数据（hex），**stderr** 输出进度/统计，便于管道拼接
 - **退出码**：0 = 成功，1 = 验证失败或参数错误
-- **确定性**：`simulate` 的 seed 固定时输出完全可复现
 
-## 与 trip-core 的关系
+## 与 gyid-shared / trip-core 的关系
 
-`trip-cli` 是 `trip-core` 协议库的薄封装，不引入额外的协议逻辑。所有 CBOR 编解码、签名、哈希、PSD/Levy/Hamiltonian/Trust 计算均由 `trip-core` 完成，CLI 仅负责参数解析与 I/O。
+用户命令的业务逻辑（身份、面包屑采集、PoH 校验、Verifier HTTP 客户端）由
+`gyid-shared` 提供；CBOR 编解码、签名、哈希链、PSD/Levy/Hamiltonian/Trust
+引擎由 `trip-core` 完成。`main.rs` 只做 clap 参数解析 + I/O + 调度。

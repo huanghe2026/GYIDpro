@@ -44,6 +44,18 @@ pub enum TripError {
     /// Levy 参数估计错误。
     #[error("levy estimation error: {0}")]
     LevyFit(String),
+
+    /// `did:geoyuan` 字符串不合法（前缀 / multibase / 公钥长度）。
+    #[error("invalid did: {0}")]
+    InvalidDid(String),
+
+    /// TIT（Trajectory Identity Token）不合法（版本 / 字段范围 / 签发者 / 签名 / 有效期）。
+    #[error("invalid tit: {0}")]
+    InvalidTit(String),
+
+    /// EVM 锚定错误（密钥 / 编码 / 签名）。
+    #[error("anchor error: {0}")]
+    Anchor(String),
 }
 
 /// trip-core 标准 Result。

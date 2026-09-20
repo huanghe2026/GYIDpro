@@ -4,11 +4,21 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "TRIP protocol CLI — keygen, breadcrumb, epoch, PoH, simulate"
+description = "GyID CLI — identity, breadcrumb collection, Active Verification, PoH"
+
+[[bin]]
+name = "gyid"
+path = "src/main.rs"
 
 [dependencies]
-trip-core = { path = "../trip-core" }
-clap = { version = "4.5", features = ["derive"] }
+# anchor feature：EVM 锚定（ABI 编码 + EIP-1559 签名）
+trip-core = { path = "../trip-core", features = ["anchor"] }
+gyid-shared = { path = "../gyid-shared", features = ["encrypt", "http-client"] }
+clap = { workspace = true }
 hex = "0.4"
 rand = "0.8"
 h3o = "0.7"
+tokio = { workspace = true }
+serde_json = { workspace = true }
+# JSON-RPC（EVM 锚定）
+reqwest = { workspace = true }

@@ -1,16 +1,24 @@
-//! TRIP 协议 CLI — 面包屑、epoch、PoH 证书的命令行工具。
+//! GyID CLI — 身份管理、面包屑采集、Active Verification、PoH 证书。
 //!
-//! 数据格式：CBOR 结构以 hex 编码，链文件每行一条 hex CBOR。
+//! 用户命令（面向终端用户）：
+//!   gyid init / collect / verify / poh-list / poh-show
 //!
-//! 运行 `trip --help` 查看完整命令列表。
+//! 高级命令（协议开发者，advanced）：
+//!   gyid keygen / breadcrumb / chain / epoch / poh / simulate
+//!
+//! 运行 `gyid --help` 查看完整命令列表。
+
+mod anchor_cmds;
 
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
+use anchor_cmds::AnchorCmd;
 use clap::{Parser, Subcommand};
 use trip_core::breadcrumb::{Breadcrumb, MetaFlags};
 use trip_core::chain::ChainRules;
 use trip_core::crypto::ProtocolKey;
+use trip_core::did::{AnchorReference, DidDocument, DidDocumentConfig};
 use trip_core::engine::behavior::{BehavioralProfile, BreadcrumbView};
 use trip_core::engine::hamiltonian::evaluate;
 use trip_core::engine::levy::fit as levy_fit;
@@ -19,9 +27,10 @@ use trip_core::engine::sim::{trip_walk_path, SimConfig, TripConfig};
 use trip_core::engine::trust::{alpha_in_bio_range, can_claim_handle, trust_score, TrustInput};
 use trip_core::epoch::Epoch;
 use trip_core::poh::PohCertificate;
+use trip_core::tit::{Tit, TitClaims, TitIssuer};
 
 #[derive(Parser)]
-#[command(name = "trip", version, about = "TRIP protocol CLI")]
+#[command(name = "gyid", version, about = "GyID CLI — 身份 / 采集 / 验证 / PoH")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -29,34 +38,94 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// 生成新 Ed25519 密钥对（输出 seed + pubkey hex）
+    // ── 用户命令 ──
+    /// 生成新 GyID 身份（输出 seed + pubkey）
+    Init,
+
+    /// 持续采集面包屑并上传到 Verifier（daemon 模式，需 GPS）
+    Collect {
+        /// Verifier URL（如 http://localhost:8080）
+        #[arg(long)]
+        verifier: String,
+        /// 身份 seed（64 hex chars）
+        #[arg(long)]
+        seed: String,
+        /// 采集间隔（秒，≥900 符合 ChainRules）
+        #[arg(long, default_value = "900")]
+        interval: u64,
+    },
+
+    /// 发起 Active Verification（RP 角色，轮询取回 PoH）
+    Verify {
+        /// Verifier URL
+        #[arg(long)]
+        verifier: String,
+        /// 被验证方公钥（64 hex chars）
+        #[arg(long)]
+        attester: String,
+        /// RP nonce（32 hex chars，不传则随机生成）
+        #[arg(long)]
+        rp_nonce: Option<String>,
+    },
+
+    /// 列出某 attester 已签发的 PoH challenge_id
+    PohList {
+        /// Verifier URL
+        #[arg(long)]
+        verifier: String,
+        /// 被验证方公钥（64 hex chars）
+        #[arg(long)]
+        attester: String,
+    },
+
+    /// 解析并展示 PoH 证书字段（pretty-print）
+    PohShow {
+        /// PoH 证书 hex CBOR
+        hex_cbor: String,
+    },
+
+    // ── 高级命令（协议开发者）──
+    /// (advanced) 生成 Ed25519 密钥对
     Keygen,
-    /// 面包屑签名 / 验签
+    /// (advanced) 面包屑签名 / 验签
     Breadcrumb {
         #[command(subcommand)]
         action: BreadcrumbCmd,
     },
-    /// 验证面包屑链（去重、间隔、签名、哈希链）
+    /// (advanced) 验证面包屑链
     Chain {
         /// 链文件路径（每行一条 hex CBOR 面包屑）
         file: PathBuf,
     },
-    /// Epoch 封装 / 验证
+    /// (advanced) Epoch 封装 / 验证
     Epoch {
         #[command(subcommand)]
         action: EpochCmd,
     },
-    /// PoH 证书签发 / 验签
+    /// (advanced) PoH 证书签发 / 验签
     Poh {
         #[command(subcommand)]
         action: PohCmd,
     },
-    /// 端到端仿真（生成轨迹 → 面包屑 → 画像 → PoH）
+    /// (advanced) did:geoyuan 生成 / 解析 / DID Document
+    Did {
+        #[command(subcommand)]
+        action: DidCmd,
+    },
+    /// (advanced) TIT（轨迹身份令牌）签发 / 验签
+    Tit {
+        #[command(subcommand)]
+        action: TitCmd,
+    },
+    /// (advanced) EVM 链上锚定（GeoTITRegistry）
+    Anchor {
+        #[command(subcommand)]
+        action: AnchorCmd,
+    },
+    /// (advanced) 端到端仿真
     Simulate {
-        /// 随机种子
         #[arg(long, default_value = "2024")]
         seed: u64,
-        /// 面包屑数量
         #[arg(long, default_value = "512")]
         count: usize,
     },
@@ -66,90 +135,62 @@ enum Cmd {
 enum BreadcrumbCmd {
     /// 签名一条面包屑
     Sign {
-        /// 身份密钥 seed（64 hex chars）
         #[arg(long)]
         seed: String,
-        /// 面包屑序号
         #[arg(long)]
         index: u64,
-        /// Unix 秒时间戳
         #[arg(long)]
         timestamp: u64,
-        /// H3 cell index（u64）
         #[arg(long)]
         cell: u64,
-        /// H3 分辨率
         #[arg(long, default_value = "10")]
         resolution: u8,
-        /// 前一块哈希（64 hex chars，创世省略）
         #[arg(long)]
         prev: Option<String>,
-        /// 探索会话标志（允许较短间隔）
         #[arg(long)]
         exploration: bool,
     },
     /// 验证一条面包屑的签名
-    Verify {
-        /// hex CBOR 面包屑
-        hex_cbor: String,
-    },
+    Verify { hex_cbor: String },
 }
 
 #[derive(Subcommand)]
 enum EpochCmd {
     /// 从面包屑链封装 epoch（从 stdin 读 hex CBOR，每行一条）
     Seal {
-        /// 身份密钥 seed（64 hex chars）
         #[arg(long)]
         seed: String,
-        /// epoch 序号
         #[arg(long)]
         number: u64,
     },
     /// 验证 epoch 签名 + Merkle 覆盖
-    Verify {
-        /// hex CBOR epoch
-        hex_cbor: String,
-        /// 链文件路径
-        file: PathBuf,
-    },
+    Verify { hex_cbor: String, file: PathBuf },
 }
 
 #[derive(Subcommand)]
 enum PohCmd {
     /// 签发 PoH 证书（Verifier 侧）
     Issue {
-        /// Verifier 密钥 seed（64 hex chars）
         #[arg(long)]
         verifier_seed: String,
-        /// 被证明身份公钥（64 hex chars）
         #[arg(long)]
         identity: String,
-        /// PSD α
         #[arg(long)]
         alpha: f64,
-        /// Levy β
         #[arg(long)]
         beta: f64,
-        /// Levy κ
         #[arg(long)]
         kappa: f64,
-        /// 临界置信度
         #[arg(long)]
         confidence: f64,
-        /// 信任分
         #[arg(long)]
         trust: f64,
-        /// unique cell 数
         #[arg(long)]
         unique_cells: u64,
-        /// 面包屑总数
         #[arg(long)]
         breadcrumb_count: u64,
-        /// RP nonce（32 hex chars）
         #[arg(long, default_value = "000102030405060708090a0b0c0d0e0f")]
         nonce: String,
-        /// 链头哈希（64 hex chars，默认全零）
         #[arg(
             long,
             default_value = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -158,29 +199,107 @@ enum PohCmd {
     },
     /// 验证 PoH 证书（RP 侧）
     Verify {
-        /// hex CBOR PoH 证书
         hex_cbor: String,
-        /// Verifier 公钥（64 hex chars）
         #[arg(long)]
         verifier_pubkey: String,
-        /// RP nonce（32 hex chars）
         #[arg(long)]
         nonce: String,
-        /// 当前 Unix 秒
         #[arg(long)]
         now: u64,
-        /// 最低置信度
         #[arg(long, default_value = "0.1")]
         min_confidence: f64,
-        /// 最低信任分
         #[arg(long, default_value = "20.0")]
         min_trust: f64,
     },
 }
 
-fn main() {
+#[derive(Subcommand)]
+enum DidCmd {
+    /// 从身份 seed 生成 DID + W3C DID Document（JSON）
+    Show {
+        /// 身份 seed（64 hex chars）
+        #[arg(long)]
+        seed: String,
+        /// Verifier base URL（写入 #verifier 与 #tit 端点）
+        #[arg(long)]
+        verifier: Option<String>,
+        /// GPv1 libp2p multiaddr（#p2p 端点）
+        #[arg(long)]
+        p2p: Option<String>,
+        /// geoyuan.com 展示名（@nickname）
+        #[arg(long)]
+        handle: Option<String>,
+        /// EVM 锚定指针，形如 eip155:8453:0xRegistry
+        #[arg(long)]
+        anchor: Option<String>,
+    },
+    /// 解析 DID 回 Ed25519 公钥
+    Resolve {
+        /// did:geoyuan:z…
+        did: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum TitCmd {
+    /// 签发 TIT（默认身份自签；--issuer verifier 用 Verifier 密钥背书）
+    Issue {
+        /// 签发者 seed（64 hex chars）
+        #[arg(long)]
+        seed: String,
+        /// --issuer verifier 时的被证明方公钥（64 hex chars）
+        #[arg(long)]
+        identity: Option<String>,
+        /// 签发者：identity | verifier
+        #[arg(long, default_value = "identity")]
+        issuer: String,
+        #[arg(long)]
+        epochs: u64,
+        #[arg(long)]
+        breadcrumbs: u64,
+        #[arg(long)]
+        unique_cells: u64,
+        #[arg(long)]
+        trust: f64,
+        /// 有效期（秒）
+        #[arg(long, default_value = "3600")]
+        validity: u64,
+        /// 签发时间（Unix 秒；默认当前时间）
+        #[arg(long)]
+        issued_at: Option<u64>,
+    },
+    /// 验签并展示 TIT（Base64url 或 hex CBOR）
+    Verify {
+        tit: String,
+        /// verifier 签发时的 Verifier 公钥（64 hex chars）
+        #[arg(long)]
+        verifier_pubkey: Option<String>,
+        /// 当前时间（Unix 秒；默认当前时间）
+        #[arg(long)]
+        now: Option<u64>,
+    },
+}
+
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
     match cli.cmd {
+        // ── 用户命令 ──
+        Cmd::Init => cmd_init(),
+        Cmd::Collect {
+            verifier,
+            seed,
+            interval,
+        } => cmd_collect(&verifier, &seed, interval).await,
+        Cmd::Verify {
+            verifier,
+            attester,
+            rp_nonce,
+        } => cmd_verify(&verifier, &attester, rp_nonce).await,
+        Cmd::PohList { verifier, attester } => cmd_poh_list(&verifier, &attester).await,
+        Cmd::PohShow { hex_cbor } => cmd_poh_show(&hex_cbor),
+
+        // ── 高级命令 ──
         Cmd::Keygen => cmd_keygen(),
         Cmd::Breadcrumb { action } => match action {
             BreadcrumbCmd::Sign {
@@ -241,11 +360,562 @@ fn main() {
                 min_trust,
             ),
         },
+        Cmd::Did { action } => match action {
+            DidCmd::Show {
+                seed,
+                verifier,
+                p2p,
+                handle,
+                anchor,
+            } => cmd_did_show(
+                &seed,
+                verifier.as_deref(),
+                p2p.as_deref(),
+                handle.as_deref(),
+                anchor.as_deref(),
+            ),
+            DidCmd::Resolve { did } => cmd_did_resolve(&did),
+        },
+        Cmd::Tit { action } => match action {
+            TitCmd::Issue {
+                seed,
+                identity,
+                issuer,
+                epochs,
+                breadcrumbs,
+                unique_cells,
+                trust,
+                validity,
+                issued_at,
+            } => cmd_tit_issue(
+                &seed,
+                identity.as_deref(),
+                &issuer,
+                epochs,
+                breadcrumbs,
+                unique_cells,
+                trust,
+                validity,
+                issued_at,
+            ),
+            TitCmd::Verify {
+                tit,
+                verifier_pubkey,
+                now,
+            } => cmd_tit_verify(&tit, verifier_pubkey.as_deref(), now),
+        },
+        Cmd::Anchor { action } => anchor_cmds::dispatch(action).await,
         Cmd::Simulate { seed, count } => cmd_simulate(seed, count),
     }
 }
 
-// ── 工具函数 ──
+// ═══════════════════════════════════════════════════════════════════════
+// 用户命令实现
+// ═══════════════════════════════════════════════════════════════════════
+
+/// `gyid init`：生成新 GyID 身份。
+fn cmd_init() {
+    let id = gyid_shared::Identity::generate();
+    println!("seed    = {}", id.seed_hex());
+    println!("pubkey  = {}", id.pubkey_hex());
+    eprintln!("✓ 身份已创建，请保管好 seed");
+}
+
+/// `gyid collect`：daemon 模式采集面包屑并上传。
+async fn cmd_collect(verifier_url: &str, seed_hex: &str, interval: u64) {
+    let identity = match gyid_shared::Identity::from_seed_hex(seed_hex) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("✗ seed 无效：{e}");
+            std::process::exit(1);
+        }
+    };
+    let pubkey_hex = identity.pubkey_hex();
+    let client = gyid_shared::VerifierClient::new(verifier_url);
+
+    // 拉取当前链状态（index / chain_head / last_ts）
+    let identity_info = match client.get_identity(&pubkey_hex).await {
+        Ok(info) => info,
+        Err(_) => {
+            eprintln!("（链不存在，将从 index=0 开始）");
+            gyid_shared::verifier_client::IdentityInfo {
+                attester: pubkey_hex.clone(),
+                breadcrumb_count: 0,
+                unique_cells: 0,
+                chain_head: String::new(),
+                last_ts: 0,
+            }
+        }
+    };
+
+    let mut index = identity_info.breadcrumb_count;
+    let mut prev_hash: Option<[u8; 32]> = if identity_info.chain_head.is_empty() {
+        None
+    } else {
+        Some(parse_32bytes(&identity_info.chain_head, "chain_head"))
+    };
+    let mut last_ts = identity_info.last_ts;
+
+    eprintln!("身份: {pubkey_hex}");
+    eprintln!(
+        "当前链: {} 条, 链头: {}",
+        identity_info.breadcrumb_count,
+        {
+            let h = &identity_info.chain_head;
+            if h.is_empty() {
+                "(空)".into()
+            } else {
+                h[..16].to_string()
+            }
+        }
+    );
+    eprintln!("采集间隔: {interval}s  (Ctrl-C 停止)");
+
+    // 先探测定位源：无 GPS 时快速失败，避免空等一个 interval
+    let first_pos = match get_location() {
+        Some(pos) => pos,
+        None => {
+            eprintln!("✗ 无法获取 GPS 位置（未找到定位源）");
+            eprintln!(
+                "  Linux 需 geoclue2 / GPS 硬件；开发测试可用 gyid-shared 的 seed_chain 夹具"
+            );
+            std::process::exit(1);
+        }
+    };
+    let mut pending_pos: Option<(f64, f64)> = Some(first_pos);
+
+    loop {
+        // 等待间隔（首轮已探到位置则立即采集）
+        if pending_pos.is_none() {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let wait = if last_ts == 0 {
+                interval
+            } else {
+                interval.saturating_sub(now.saturating_sub(last_ts))
+            };
+            if wait > 0 {
+                eprintln!("等待 {wait}s 到下一个采集点…");
+                tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+            }
+        }
+
+        // 获取 GPS 位置
+        let (lat, lng) = match pending_pos.take().or_else(get_location) {
+            Some(pos) => pos,
+            None => {
+                eprintln!("✗ 无法获取 GPS 位置（定位源丢失）");
+                std::process::exit(1);
+            }
+        };
+
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        // 采集面包屑
+        let bc = match gyid_shared::collect_breadcrumb(
+            &identity, lat, lng, 10, ts, index, prev_hash, false, None,
+        ) {
+            Ok(bc) => bc,
+            Err(e) => {
+                eprintln!("✗ 采集失败：{e}");
+                continue;
+            }
+        };
+        let cbor = bc.to_cbor();
+
+        eprintln!(
+            "采集 #{}: lat={:.5} lng={:.5} cell={} ts={}",
+            index, lat, lng, bc.h3_cell, ts
+        );
+
+        // 上传
+        match client.upload_evidence(cbor).await {
+            Ok(resp) => {
+                eprintln!(
+                    "  上传成功: stored={} unique={} head={}",
+                    resp.stored,
+                    resp.unique_cells,
+                    &resp.chain_head[..16]
+                );
+                index = resp.stored;
+                prev_hash = Some(parse_32bytes(&resp.chain_head, "chain_head"));
+                last_ts = ts;
+            }
+            Err(e) => {
+                eprintln!("  上传失败：{e}");
+            }
+        }
+    }
+}
+
+/// `gyid verify`：RP 发起 Active Verification，轮询取回 PoH。
+async fn cmd_verify(verifier_url: &str, attester_hex: &str, rp_nonce_opt: Option<String>) {
+    let client = gyid_shared::VerifierClient::new(verifier_url);
+
+    // 生成或使用传入的 rp_nonce
+    let rp_nonce_hex = match rp_nonce_opt {
+        Some(n) => n,
+        None => {
+            use rand::RngCore;
+            let mut buf = [0u8; 16];
+            rand::rngs::OsRng.fill_bytes(&mut buf);
+            hex::encode(buf)
+        }
+    };
+
+    eprintln!("RP nonce: {rp_nonce_hex}");
+    eprintln!("Attester: {attester_hex}");
+
+    // 1) 请求挑战
+    eprintln!("POST /v1/verify …");
+    let challenge = match client.request_challenge(attester_hex, &rp_nonce_hex).await {
+        Ok(info) => info,
+        Err(e) => {
+            eprintln!("✗ 请求挑战失败：{e}");
+            std::process::exit(1);
+        }
+    };
+    eprintln!(
+        "挑战 {} 已创建，过期 {}，delivered={}",
+        &challenge.challenge_id[..8.min(challenge.challenge_id.len())],
+        challenge.expires_at,
+        challenge.delivered
+    );
+    if !challenge.delivered {
+        eprintln!("✗ 挑战未被推送到 Attester（delivered=false），请确认 Attester 已连 WS");
+        std::process::exit(1);
+    }
+
+    // 2) 提示用户在 Attester 端签名
+    eprintln!("\n请在 Attester 端完成签名响应（CLI 不能自动签名）。");
+    eprintln!("等待 PoH 签发…");
+
+    // 3) 轮询 PoH
+    let poll_deadline = challenge.expires_at + 60; // 额外 60s 缓冲
+    let poh_bytes: Vec<u8>;
+    loop {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if now > poll_deadline {
+            eprintln!("✗ 轮询超时");
+            std::process::exit(1);
+        }
+
+        match client.fetch_poh(&challenge.challenge_id).await {
+            Ok(gyid_shared::verifier_client::PohFetch::Issued(bytes)) => {
+                poh_bytes = bytes;
+                break;
+            }
+            Ok(gyid_shared::verifier_client::PohFetch::Pending { expires_at }) => {
+                eprintln!("  Pending (expires_at={expires_at})，1s 后重试…");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+            Err(e) => {
+                eprintln!("  轮询错误：{e}，2s 后重试…");
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+        }
+    }
+
+    let poh_hex = hex::encode(&poh_bytes);
+    eprintln!("\nPoH 证书已取回（{} 字节）", poh_bytes.len());
+    println!("{poh_hex}");
+
+    // 4) 本地校验
+    let vk_hex = match client.fetch_verifier_pubkey_hex().await {
+        Ok(vk) => vk,
+        Err(e) => {
+            eprintln!("✗ 获取 Verifier 公钥失败：{e}");
+            std::process::exit(1);
+        }
+    };
+    let vk = parse_32bytes(&vk_hex, "verifier_pubkey");
+    let nonce = parse_16bytes(&rp_nonce_hex, "rp_nonce");
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let info =
+        gyid_shared::verify_poh(&poh_bytes, &vk, &nonce, now, 0.1, 20.0).expect("verify_poh");
+
+    eprintln!();
+    print_poh_info(&info);
+}
+
+/// `gyid poh-list`：列出某 attester 已签发的 PoH。
+async fn cmd_poh_list(verifier_url: &str, attester_hex: &str) {
+    let client = gyid_shared::VerifierClient::new(verifier_url);
+
+    match client.list_pohs(attester_hex).await {
+        Ok(list) => {
+            eprintln!("Attester: {}", list.attester);
+            eprintln!("已签发 PoH: {} 张", list.count);
+            for (i, cid) in list.challenge_ids.iter().enumerate() {
+                eprintln!("  [{}] {}", i, cid);
+            }
+        }
+        Err(e) => {
+            eprintln!("✗ 查询失败：{e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// `gyid poh-show`：解析并 pretty-print PoH 证书字段。
+fn cmd_poh_show(hex_cbor: &str) {
+    let bytes = hex::decode(hex_cbor).unwrap_or_else(|e| {
+        eprintln!("✗ hex 解码错误：{e}");
+        std::process::exit(1);
+    });
+    let cert = PohCertificate::from_cbor(&bytes).unwrap_or_else(|e| {
+        eprintln!("✗ CBOR 解析错误：{e}");
+        std::process::exit(1);
+    });
+
+    println!("=== PoH 证书 ===");
+    println!("identity         = {}", hex::encode(cert.identity));
+    println!("issued_at        = {}", cert.issued_at);
+    println!("epoch_count      = {}", cert.epoch_count);
+    println!("alpha            = {:.4}", cert.alpha);
+    println!("beta             = {:.4}", cert.beta);
+    println!("kappa            = {:.4}", cert.kappa);
+    println!("pi               = {:.4}", cert.pi);
+    println!("confidence       = {:.4}", cert.criticality_confidence);
+    println!("trust            = {:.2}", cert.trust);
+    println!("unique_cells     = {}", cert.unique_cells);
+    println!("breadcrumb_count = {}", cert.breadcrumb_count);
+    println!("validity_secs    = {}", cert.validity_secs);
+    println!("nonce            = {}", hex::encode(cert.nonce));
+    println!("chain_head       = {}", hex::encode(cert.chain_head));
+    println!(
+        "verifier_sig     = {}",
+        hex::encode(cert.verifier_signature)
+    );
+
+    let policy_ok = cert.meets_policy(0.1, 20.0);
+    println!(
+        "\nmeets_policy(0.1, 20.0) = {}",
+        if policy_ok { "PASS" } else { "FAIL" }
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 工具函数
+// ═══════════════════════════════════════════════════════════════════════
+
+/// 尝试获取 GPS 位置。无 GPS 返回 None。
+///
+/// 桌面 Linux 通常无 GPS 硬件；移动设备/嵌入式平台可在此接入
+/// geoclue2 D-Bus / Android LocationManager / NMEA 串口等定位源。
+fn get_location() -> Option<(f64, f64)> {
+    None
+}
+
+fn print_poh_info(info: &gyid_shared::PohInfo) {
+    println!("\n=== PoH 校验结果 ===");
+    println!("identity         = {}", hex::encode(info.identity));
+    println!("issued_at        = {}", info.issued_at);
+    println!("epoch_count      = {}", info.epoch_count);
+    println!("alpha            = {:.4}", info.alpha);
+    println!("beta             = {:.4}", info.beta);
+    println!("kappa            = {:.4}", info.kappa);
+    println!("pi               = {:.4}", info.pi);
+    println!("confidence       = {:.4}", info.criticality_confidence);
+    println!("trust            = {:.2}", info.trust);
+    println!("unique_cells     = {}", info.unique_cells);
+    println!("breadcrumb_count = {}", info.breadcrumb_count);
+    println!("validity_secs    = {}", info.validity_secs);
+    println!("nonce            = {}", hex::encode(info.nonce));
+    println!("chain_head       = {}", hex::encode(info.chain_head));
+    println!();
+    println!("fresh        = {}", info.fresh);
+    println!("policy_pass  = {}", info.policy_pass);
+    println!("is_trusted   = {}", info.is_trusted());
+    if info.is_trusted() {
+        eprintln!("\n✓ 验证通过 (FRESH + PASS)");
+    } else {
+        eprintln!("\n✗ 未通过");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// did:geoyuan / TIT（GYIP-0003 §5.4）
+// ═══════════════════════════════════════════════════════════════════════
+
+/// 当前 Unix 秒。
+fn now_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// `gyid did show`：从 seed 生成 DID 与 DID Document。
+fn cmd_did_show(
+    seed_hex: &str,
+    verifier: Option<&str>,
+    p2p: Option<&str>,
+    handle: Option<&str>,
+    anchor: Option<&str>,
+) {
+    let key = ProtocolKey::from_seed(&parse_seed(seed_hex));
+    let pubkey = key.public_bytes();
+
+    let anchor_ref = anchor.map(|s| {
+        AnchorReference::parse(s).unwrap_or_else(|| {
+            eprintln!("错误：--anchor 需形如 eip155:<chain_id>:<0x地址>，收到 {s}");
+            std::process::exit(1);
+        })
+    });
+    let base = verifier.map(|v| v.trim_end_matches('/').to_string());
+
+    let cfg = DidDocumentConfig {
+        tit_endpoint: base.as_ref().map(|b| format!("{b}/v1/tit")),
+        verifier_endpoint: base,
+        p2p_endpoint: p2p.map(str::to_string),
+        anchor: anchor_ref,
+        handle: handle.map(str::to_string),
+        updated: Some(now_unix_secs()),
+    };
+    let doc = DidDocument::build(&pubkey, &cfg);
+    let json = doc.to_json_pretty().unwrap_or_else(|e| {
+        eprintln!("DID Document 序列化失败：{e}");
+        std::process::exit(1);
+    });
+
+    println!("did       = {}", doc.id);
+    println!("pubkey    = {}", hex::encode(pubkey));
+    println!("multibase = {}", trip_core::did::multibase(&pubkey));
+    println!();
+    println!("{json}");
+}
+
+/// `gyid did resolve`：DID → 公钥。
+fn cmd_did_resolve(did: &str) {
+    match trip_core::did::decode(did) {
+        Ok(pubkey) => {
+            println!("did       = {}", trip_core::did::encode(&pubkey));
+            println!("pubkey    = {}", hex::encode(pubkey));
+            println!("multibase = {}", trip_core::did::multibase(&pubkey));
+        }
+        Err(e) => {
+            eprintln!("✗ 解析失败：{e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// `gyid tit issue`：签发 TIT（身份自签或 Verifier 背书）。
+#[allow(clippy::too_many_arguments)] // CLI 参数直透协议字段
+fn cmd_tit_issue(
+    seed_hex: &str,
+    identity_hex: Option<&str>,
+    issuer: &str,
+    epochs: u64,
+    breadcrumbs: u64,
+    unique_cells: u64,
+    trust: f64,
+    validity: u64,
+    issued_at: Option<u64>,
+) {
+    let key = ProtocolKey::from_seed(&parse_seed(seed_hex));
+    let issued = issued_at.unwrap_or_else(now_unix_secs);
+
+    let issuer_kind = match issuer {
+        "identity" => TitIssuer::Identity,
+        "verifier" => TitIssuer::Verifier,
+        other => {
+            eprintln!("错误：--issuer 只能是 identity 或 verifier（收到 {other}）");
+            std::process::exit(1);
+        }
+    };
+
+    let identity = match issuer_kind {
+        TitIssuer::Verifier => {
+            let hex = identity_hex.unwrap_or_else(|| {
+                eprintln!("错误：--issuer verifier 时必须用 --identity 指定被证明方公钥");
+                std::process::exit(1);
+            });
+            parse_32bytes(hex, "identity")
+        }
+        _ => key.public_bytes(),
+    };
+
+    let claims = TitClaims {
+        identity,
+        epochs,
+        breadcrumbs,
+        unique_cells,
+        trust,
+        issued_at: issued,
+        validity_secs: validity,
+    };
+    let tit = match issuer_kind {
+        TitIssuer::Identity => Tit::issue_identity_signed(&key, claims),
+        TitIssuer::Verifier => Tit::issue_verifier_signed(&key, claims),
+        TitIssuer::Unsigned => Tit::unsigned(claims),
+    };
+    tit.validate().unwrap_or_else(|e| {
+        eprintln!("✗ TIT 字段不合法：{e}");
+        std::process::exit(1);
+    });
+
+    println!("issuer      = {}", tit.issuer.as_str());
+    println!("did         = {}", tit.did());
+    println!("identity    = {}", hex::encode(tit.claims.identity));
+    println!("epochs      = {}", tit.claims.epochs);
+    println!("breadcrumbs = {}", tit.claims.breadcrumbs);
+    println!("unique_cells= {}", tit.claims.unique_cells);
+    println!("trust       = {}", tit.claims.trust);
+    println!("issued_at   = {}", tit.claims.issued_at);
+    println!("validity    = {}", tit.claims.validity_secs);
+    println!("handle_ok   = {}", tit.meets_handle_threshold());
+    println!("cbor_hex    = {}", hex::encode(tit.to_cbor()));
+    println!("base64url   = {}", tit.to_base64url());
+}
+
+/// `gyid tit verify`：验签 + 新鲜性（Base64url 优先，回退 hex CBOR）。
+fn cmd_tit_verify(token: &str, verifier_pubkey: Option<&str>, now: Option<u64>) {
+    let tit = Tit::from_base64url(token)
+        .or_else(|_| {
+            hex::decode(token.trim())
+                .map_err(|e| trip_core::TripError::InvalidTit(format!("hex decode: {e}")))
+                .and_then(|b| Tit::from_cbor(&b))
+        })
+        .unwrap_or_else(|e| {
+            eprintln!("✗ 无法解析 TIT：{e}");
+            std::process::exit(1);
+        });
+
+    let vk = verifier_pubkey.map(|h| parse_32bytes(h, "verifier_pubkey"));
+    let now = now.unwrap_or_else(now_unix_secs);
+
+    println!("issuer      = {}", tit.issuer.as_str());
+    println!("did         = {}", tit.did());
+    println!("epochs      = {}", tit.claims.epochs);
+    println!("breadcrumbs = {}", tit.claims.breadcrumbs);
+    println!("unique_cells= {}", tit.claims.unique_cells);
+    println!("trust       = {}", tit.claims.trust);
+    println!("issued_at   = {}", tit.claims.issued_at);
+    println!("validity    = {}", tit.claims.validity_secs);
+    println!("handle_ok   = {}", tit.meets_handle_threshold());
+
+    match tit.verify(vk.as_ref(), now) {
+        Ok(()) => eprintln!("\n✓ TIT 验签通过且未过期"),
+        Err(e) => {
+            eprintln!("\n✗ 校验失败：{e}");
+            std::process::exit(1);
+        }
+    }
+}
 
 fn parse_seed(hex_str: &str) -> [u8; 32] {
     hex::decode(hex_str)
@@ -326,7 +996,9 @@ fn read_chain_from_file(path: &std::path::Path) -> Vec<Breadcrumb> {
     crumbs
 }
 
-// ── 命令实现 ──
+// ═══════════════════════════════════════════════════════════════════════
+// 高级命令实现（保留原有逻辑）
+// ═══════════════════════════════════════════════════════════════════════
 
 fn cmd_keygen() {
     use rand::rngs::OsRng;
@@ -701,8 +1373,3 @@ fn cmd_simulate(seed: u64, count: usize) {
     );
     println!("\n=== {} ===", if policy_ok { "PASS" } else { "FAIL" });
 }
-
-// ── ProtocolKey 扩展（仅 CLI 用）──
-
-// trip-core 有意不暴露私钥序列化（安全设计）。
-// keygen 命令直接生成 32 字节 seed 并打印，再用 from_seed 构造密钥获取公钥。

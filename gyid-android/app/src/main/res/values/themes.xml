@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose 负责实际主题；XML 主题仅给 Activity 启动 / Service 一个 NoActionBar 基底 -->
+    <style name="Theme.Gyid" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/gyid_primary_dark</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

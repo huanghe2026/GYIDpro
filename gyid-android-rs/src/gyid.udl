@@ -1,0 +1,65 @@
+// gyid.udl — UniFFI 接口描述：暴露给 Kotlin 的 GyID 核心 API。
+//
+// 字节一律 hex 字符串（与 gyid-wasm 桥一致），避免 Kotlin/Java 侧
+// ByteArray 跨 JNI 传递与 JSON 序列化的麻烦。
+// 错误经 [Throws=GyidError] 映射为 Kotlin 端异常。
+
+namespace gyid {
+    /// 生成新 Ed25519 身份（OsRng 真随机）。
+    [Throws=GyidError]
+    Keypair generate_keypair();
+
+    /// 从 seed hex 推导公钥 hex（解锁本地身份时用）。
+    [Throws=GyidError]
+    string pubkey_from_seed(string seed_hex);
+
+    /// 从 (lat,lng) 量化 H3 cell，返回 16 字符 hex（避免 u64 精度问题）。
+    [Throws=GyidError]
+    string h3_to_cell(f64 lat, f64 lng, u8 res);
+
+    /// 签名一条面包屑，返回确定性 CBOR hex（可直接拼进 evidence 帧流）。
+    /// extras：wifi_bssid_hex=12 hex（最强 AP MAC）；imu_digest_hex=64 hex（SHA-256）。
+    [Throws=GyidError]
+    string sign_breadcrumb(string seed_hex, u64 index, u64 ts, f64 lat, f64 lng, u8 res, string? prev_hex, boolean exploration, string? wifi_bssid_hex, string? imu_digest_hex);
+
+    /// 从单条面包屑 CBOR hex 取 block_hash（32 字节 hex），用于本地续链。
+    [Throws=GyidError]
+    string breadcrumb_block_hash(string crumb_hex);
+
+    /// 校验 CBOR 帧流（hex）形式的面包屑链：签名 / 哈希链 / 间隔 / 去重。
+    [Throws=GyidError]
+    boolean verify_chain(string hex_crumbs);
+
+    /// Attester 对活体挑战签名：入参挑战 CBOR hex，返回响应 CBOR hex。
+    [Throws=GyidError]
+    string sign_liveness_response(string seed_hex, string challenge_hex);
+
+    /// RP 校验 PoH 证书：Verifier 签名 + nonce 新鲜性 + 策略门槛。
+    [Throws=GyidError]
+    PohInfo verify_poh(string poh_hex, string verifier_pubkey_hex, string nonce_hex, u64 now, f64 min_confidence, f64 min_trust);
+};
+
+/// 核心错误（带 detail 的字段型 error，UDL 须用 [Error] interface）。
+/// 字段名避开 message：Kotlin 端 Throwable.message 会与同名字段形成
+/// 重载/属性歧义（uniffi 生成 value.message 无法解析）。
+[Error]
+interface GyidError {
+    BadRequest(string detail);
+    NotFound(string detail);
+    Expired(string detail);
+    Internal(string detail);
+};
+
+dictionary Keypair {
+    string seed_hex;
+    string pubkey_hex;
+};
+
+dictionary PohInfo {
+    boolean fresh;
+    boolean policy;
+    f64 alpha;
+    f64 trust;
+    u64 unique_cells;
+    u64 breadcrumb_count;
+};

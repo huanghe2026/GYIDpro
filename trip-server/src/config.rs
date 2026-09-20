@@ -9,6 +9,7 @@
 use std::env;
 
 use trip_core::crypto::ProtocolKey;
+use trip_core::did::AnchorReference;
 
 /// Verifier 服务配置。
 #[derive(Debug, Clone)]
@@ -23,6 +24,12 @@ pub struct Config {
     pub min_confidence: f64,
     /// RP 策略：最小信任分。
     pub min_trust: f64,
+    /// CORS 允许的 Origin 列表。`["*"]` 表示允许任意 Origin（仅开发环境）。
+    pub cors_origins: Vec<String>,
+    /// 对外可访问的 base URL（写入 DID Document 的 `#verifier` / `#tit` 端点）。
+    pub public_url: String,
+    /// EVM 链上锚定指针（写入 DID Document 的 `#anchor`）。
+    pub anchor: Option<AnchorReference>,
 }
 
 impl Default for Config {
@@ -33,6 +40,9 @@ impl Default for Config {
             challenge_ttl_secs: 60,
             min_confidence: 0.1,
             min_trust: 20.0,
+            cors_origins: vec!["*".to_string()],
+            public_url: "http://127.0.0.1:8080".to_string(),
+            anchor: None,
         }
     }
 }
@@ -65,6 +75,31 @@ impl Config {
         if let Ok(v) = env::var("TRIP_MIN_TRUST") {
             if let Ok(n) = v.parse() {
                 cfg.min_trust = n;
+            }
+        }
+        if let Ok(v) = env::var("TRIP_CORS_ORIGINS") {
+            let origins: Vec<String> = v
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !origins.is_empty() {
+                cfg.cors_origins = origins;
+            }
+        }
+        if let Ok(v) = env::var("TRIP_PUBLIC_URL") {
+            let trimmed = v.trim().trim_end_matches('/');
+            if !trimmed.is_empty() {
+                cfg.public_url = trimmed.to_string();
+            }
+        }
+        if let Ok(v) = env::var("TRIP_ANCHOR") {
+            match AnchorReference::parse(v.trim()) {
+                Some(anchor) => cfg.anchor = Some(anchor),
+                None => tracing::warn!(
+                    value = %v,
+                    "TRIP_ANCHOR must be CAIP-2 eip155:<chain_id>:<registry>; ignored"
+                ),
             }
         }
         cfg

@@ -1,9 +1,0 @@
----
-import Layout from '../../layouts/Layout.astro';
-import Home from '../../components/pages/Home.astro';
-import { pages } from '../../i18n/content';
-const locale = 'zh';
----
-<Layout locale={locale} path="/zh" title={pages.zh.meta.title} description={pages.zh.meta.description}>
-  <Home locale={locale} />
-</Layout>

@@ -1,0 +1,2 @@
+# cargo ndk 产物（按 ABI 构建，不入库）
+jniLibs/

@@ -1,0 +1,35 @@
+[package]
+name = "gyid-shared"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "GyID shared business logic — identity, breadcrumb collection, chain, PoH verification, Verifier client"
+
+[dependencies]
+trip-core = { path = "../trip-core" }
+h3o = "0.7"
+serde = { workspace = true }
+serde_json = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+rand_core = "0.6"
+
+# 可选：加密本地存储（identity seed 落盘前用 PBKDF2 + AES-GCM 加密）
+aes-gcm = { version = "0.10", optional = true }
+pbkdf2 = { version = "0.12", optional = true }
+base64 = { version = "0.22", optional = true }
+rand = { workspace = true, optional = true }
+
+# 可选：异步 Verifier HTTP 客户端（CLI / Android 用）
+reqwest = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+trip-core = { path = "../trip-core" }
+
+[features]
+default = []
+encrypt = ["dep:aes-gcm", "dep:pbkdf2", "dep:base64", "dep:rand"]
+http-client = ["dep:reqwest"]

@@ -33,6 +33,9 @@ cargo run --release -p trip-server
 | `TRIP_CHALLENGE_TTL_SECS` | `60` | 活体挑战有效期 |
 | `TRIP_MIN_CONFIDENCE` | `0.1` | RP 策略最小临界置信度 |
 | `TRIP_MIN_TRUST` | `20.0` | RP 策略最小信任分 |
+| `TRIP_CORS_ORIGINS` | `*` | 允许的 Origin，逗号分隔（`*` 仅开发环境） |
+| `TRIP_PUBLIC_URL` | `http://127.0.0.1:8080` | 对外 base URL，写入 DID Document 的 `#verifier` / `#tit` 端点 |
+| `TRIP_ANCHOR` | （空） | EVM 锚定指针，CAIP-2 `eip155:<chain_id>:<registry>`，写入 `#anchor` |
 | `RUST_LOG` | `info,tower_http=warn` | 日志过滤 |
 
 ## 三方验证流程
@@ -110,6 +113,45 @@ RP 用 `/.well-known/verifier.json` 公布的公钥，调
 `PohCertificate::verify_freshness(pubkey, nonce, now)` 与
 `meets_policy(min_confidence, min_trust)` 完成校验。
 
+### `GET /v1/did/:did`（任意）
+
+`did:geoyuan:z<base58btc(Ed25519 公钥)>` → W3C DID Document
+（`Content-Type: application/did+json`）。DID 完全由公钥派生，无需任何链上
+或数据库状态即可解析。
+
+```bash
+curl -s http://127.0.0.1:8080/v1/did/did:geoyuan:zF25s3DdjXdCxYBhh2z8FBusVEMT4b9bGNFVKJi3wFoF4
+```
+
+返回 `@context` / `id` / `verificationMethod`（`publicKeyMultibase` 与 DID 同
+一 multibase）/ `authentication` / `assertionMethod` / `service`
+（`#verifier`、`#tit` 来自 `TRIP_PUBLIC_URL`，`#anchor` 来自 `TRIP_ANCHOR`）。
+DID 语法非法 → `400`。
+
+### `GET /v1/tit/:hex`（任意）
+
+Verifier 依据**已上传并通过链规则校验**的面包屑链核算统计量，签发
+Verifier 背书的 **TIT**（Trajectory Identity Token，GYIP-0003 §5.4）。
+
+```bash
+curl -s http://127.0.0.1:8080/v1/tit/<hex32 公钥>
+# {"attester":"..","did":"did:geoyuan:z..","issuer":"verifier",
+#  "epochs":5,"breadcrumbs":513,"unique_cells":498,"trust":80.3,
+#  "alpha":..,"confidence":..,"handle_ok":true,
+#  "tit_cbor_hex":"..","tit_base64url":"..","did_document_url":"/v1/did/.."}
+```
+
+与 PoH 的分工：PoH 绑定一次性 RP nonce、含完整统计指数；TIT 长期有效
+（`TRIP_VALIDITY_SECS`）、可直接放进二维码/DID Document 用于展示与发现。
+验签用 `/.well-known/verifier.json` 的同一把 Verifier 公钥：
+
+```rust
+let tit = trip_core::Tit::from_base64url(b64)?;
+tit.verify(Some(&verifier_pubkey), now_unix)?;   // 签名 + 新鲜性
+```
+
+`404`：该公钥无 evidence；`400`：hex 不合法；`500`：存量链自检失败或引擎评估失败。
+
 ### `GET /.well-known/verifier.json`
 
 ```bash
@@ -134,6 +176,9 @@ curl -s http://127.0.0.1:8080/.well-known/verifier.json
 ```bash
 # 三方联机验收门（真 TCP + WebSocket）
 cargo test -p trip-server --test three_party_flow
+
+# DID 解析 + TIT 签发验收门
+cargo test -p trip-server --test did_tit
 
 # 全部质量门
 cargo clippy --workspace --all-targets -- -D warnings

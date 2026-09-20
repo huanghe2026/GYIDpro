@@ -13,12 +13,28 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 # 哈希（块哈希 / Merkle / context digest）
 sha2 = "0.10"
+# hex 编解码（地址 / 私钥 / 裸交易输出）
+hex = { workspace = true }
 # 错误类型
 thiserror = "1.0"
 # H3 v4 空间量化（纯 Rust，WASM/移动端友好）：位移提取与 MC 轨迹量化
 h3o = "0.7"
 # Levy 采样器与 MC 轨迹仿真（StdRng ChaCha12，可复现）
 rand = "0.8"
+# DID / TIT 编码（GYIP-0003 §5.4）：base58btc 多重基、Base64url、DID Document JSON
+base58 = { workspace = true }
+base64 = "0.22"
+serde = { workspace = true }
+serde_json = { workspace = true }
+# 可选：EVM 锚定（`anchor` feature）——keccak256 ABI 编码 + EIP-1559 交易签名
+k256 = { version = "0.13", features = ["ecdsa"], optional = true }
+sha3 = { version = "0.10", optional = true }
+
+[features]
+default = []
+# EVM 链上锚定（GeoTITRegistry）：keccak256 ABI 编码 + EIP-1559 交易签名。
+# 默认关闭：WASM / 移动端只做协议与端上签名，不引入 secp256k1。
+anchor = ["dep:k256", "dep:sha3"]
 
 [dev-dependencies]
 # 黄金向量生成与测试

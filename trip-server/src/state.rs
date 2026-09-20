@@ -1,9 +1,10 @@
 //! 进程内共享状态（MVP 内存存储）。
 //!
-//! 四张表：
+//! 五张表：
 //! - `evidence`：attester 公钥 → 已验证的完整面包屑链；
 //! - `challenges`：challenge id → Active Verification 挑战记录；
 //! - `poh`：challenge id → 已签发的 PoH 证书 CBOR；
+//! - `attester_pohs`：attester 公钥 → 其已签发的 challenge_id 列表（按签发顺序）；
 //! - `ws_senders`：attester 公钥 → 其当前 WebSocket 连接的下发通道。
 //!
 //! 所有表均为 `tokio::RwLock<HashMap>`，**锁内不做 CPU 密集计算、不跨
@@ -56,6 +57,7 @@ pub struct Shared {
     pub evidence: RwLock<HashMap<[u8; 32], Vec<Breadcrumb>>>,
     pub challenges: RwLock<HashMap<[u8; 16], ChallengeRecord>>,
     pub poh: RwLock<HashMap<[u8; 16], Vec<u8>>>,
+    pub attester_pohs: RwLock<HashMap<[u8; 32], Vec<[u8; 16]>>>,
     pub ws_senders: RwLock<HashMap<[u8; 32], mpsc::UnboundedSender<OutMsg>>>,
 }
 
@@ -75,6 +77,7 @@ impl AppState {
                 evidence: RwLock::new(HashMap::new()),
                 challenges: RwLock::new(HashMap::new()),
                 poh: RwLock::new(HashMap::new()),
+                attester_pohs: RwLock::new(HashMap::new()),
                 ws_senders: RwLock::new(HashMap::new()),
             }),
         }
