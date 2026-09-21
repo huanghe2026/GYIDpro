@@ -56,6 +56,14 @@ pub enum TripError {
     /// EVM 锚定错误（密钥 / 编码 / 签名）。
     #[error("anchor error: {0}")]
     Anchor(String),
+
+    /// I/O 错误（文件读写等）。
+    #[error("io error: {0}")]
+    Io(String),
+
+    /// JSON 序列化/反序列化错误。
+    #[error("json error: {0}")]
+    Json(String),
 }
 
 /// trip-core 标准 Result。

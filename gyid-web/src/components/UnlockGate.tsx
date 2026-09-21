@@ -32,7 +32,7 @@ export default function UnlockGate(props: ParentProps) {
             fallback={
               <p class="text-gray-600 text-sm">
                 还没有身份。先到{" "}
-                <A href="/" class="text-blue-600 hover:underline">
+                <A href="/console" class="text-blue-600 hover:underline">
                   Identity 页
                 </A>{" "}
                 创建一个。

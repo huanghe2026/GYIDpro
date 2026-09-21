@@ -3,7 +3,7 @@
 > **最后更新**: 2026-09-21
 > **基于**: `docs/GYIP-0003-TRIP-GeoYuan-Dev-Plan.md` + 实际代码盘点
 >
-> **当前阶段**: W8 已闭合，W7/W9-W12 待开始
+> **当前阶段**: W8 已闭合，**W7 进行中**，W9-W12 待开始
 
 ---
 
@@ -11,7 +11,7 @@
 
 | 模块 | 内容 | 测试 |
 |------|------|------|
-| **trip-core** | 纯协议核心：确定性 CBOR、Ed25519、面包屑哈希链、Epoch/Merkle、Liveness、PoH(15字段)、DID/DID Document、TIT、`engine/`(psd/levy/behavior/hamiltonian/trust/sim)、**anchor**(ABI/EIP-1559/选择器) | **127 测试全绿** |
+| **trip-core** | 纯协议核心：确定性 CBOR、Ed25519、面包屑哈希链、Epoch/Merkle、Liveness、PoH(15字段)、DID/DID Document、TIT、`engine/`(psd/levy/behavior/hamiltonian/trust/sim/**calibration**+**calibration_report**)、**anchor**(ABI/EIP-1559/选择器) | **132 测试全绿** |
 | **trip-cli** | CLI（二进制名 `gyid`）：`did`/`tit`/`anchor`(deploy/register/epoch/handle/status) 命令 | 编译通过 |
 | **trip-server** | Verifier HTTP/WS 服务（`/v1/evidence`、`/v1/verify`、`WS /v1/challenge`、`/v1/poh`、`/v1/identity/:hex`） | 编译通过 |
 | **contracts/GeoTITRegistry** | 链上存在性登记簿：register/anchorEpoch/claimHandle，verifier 门控，零外部依赖测试 | **12 用例全过**（内存 EVM） |
@@ -63,13 +63,33 @@
 | `tools/deploy.mjs` | 部署到 Base Sepolia / 任意 EVM |
 | `tools/decode-calldata.mjs` | 解码 calldata 调试用 |
 
+### W7 进行中：GeoLife/MDC 标定（§7.1 人群参数校准）
+
+#### trip-core::engine::calibration（新增）
+- **GeoLife PLT 解析器**：支持 Microsoft Research GeoLife 格式（纬度,经度,_,_,日期时间,_）
+- **轨迹预处理**：时间排序、5分钟间隔去重、H3 res10 量化
+- **标定流水线**：PSD α 分析 + Levy MLE 拟合 + 桥校验
+- **人群统计报告**：α/β 分布、P5-P95 分位数、生物区间覆盖率
+- **ROC 分析**：多阈值 TPR/FPR、Youden's J 最优阈值
+- **边界推荐**：自动检测是否需要调整草案 α∈[0.30, 0.80] 边界
+
+#### trip-core::engine::calibration_report（新增）
+- **Markdown 白皮书生成器**：从 JSON 报告生成 IETF 风格数据白皮书草稿
+- 包含：执行摘要、数据集描述、α/β 统计表、ROC 曲线数据、方法论、结论与建议
+
+#### 运行方式
+```bash
+# 下载 GeoLife 数据后运行标定
+cargo run --release -p trip-core --example geolife_calibration /path/to/GeoLife_Trajectories_1.3 [output.json]
+```
+
 ---
 
 ## 📋 待开始（W7 / W9–W12）
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| **W7** | GeoLife/MDC 标定（地理生活日志 / 多设备一致性） | ❌ 未开始 |
+| **W7** | GeoLife/MDC 标定（地理生活日志 / 多设备一致性） | 🔄 进行中：calibration 模块 + 报告生成器已完成，待下载真实数据运行 |
 | **W9** | NeuroCriticality（神经临界性指标） | ❌ 未开始 |
 | **W10** | TRIP-Arena（多方验证竞技场） | ❌ 未开始 |
 | **W11** | diliy 整合（日历/提醒/社交） | ❌ 未开始 |
