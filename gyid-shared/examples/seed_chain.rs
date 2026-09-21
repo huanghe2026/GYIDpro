@@ -62,13 +62,13 @@ fn synth_displacements(n: usize, alpha: f64, rng: &mut Lcg) -> Vec<f64> {
         phi[k - 1] = rng.next_f64() * std::f64::consts::TAU;
     }
     let mut x = vec![0.0f64; n];
-    for j in 0..n {
+    for (j, xj) in x.iter_mut().enumerate() {
         let mut v = 0.0;
         for k in 1..=half {
             let ang = std::f64::consts::TAU * (j * k) as f64 / n as f64 + phi[k - 1];
             v += 2.0 * amp[k - 1] * ang.cos();
         }
-        x[j] = v;
+        *xj = v;
     }
     let mean = x.iter().sum::<f64>() / n as f64;
     let var = x.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n as f64;
@@ -148,8 +148,8 @@ fn main() {
             .collect();
         let engine_disp = displacements_from_cells(&cells).expect("cells valid");
         let analysis = psd_alpha(&engine_disp).expect("psd");
-        let pass = (ALPHA_LO..=ALPHA_HI).contains(&analysis.alpha)
-            && analysis.confidence >= MIN_CONF;
+        let pass =
+            (ALPHA_LO..=ALPHA_HI).contains(&analysis.alpha) && analysis.confidence >= MIN_CONF;
         eprintln!(
             "attempt {attempts}: alpha={:.4} r2={:.4} confidence={:.4} {}",
             analysis.alpha,

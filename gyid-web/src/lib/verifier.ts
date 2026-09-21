@@ -33,6 +33,23 @@ export interface PohListInfo {
   count: number;
 }
 
+/** GET /v1/explorer 单个身份条目 */
+export interface ExplorerIdentity {
+  attester: string;
+  breadcrumb_count: number;
+  unique_cells: number;
+  chain_head: string;
+  last_ts: number;
+  poh_count: number;
+}
+
+/** GET /v1/explorer 响应体 */
+export interface ExplorerInfo {
+  total_identities: number;
+  total_breadcrumbs: number;
+  identities: ExplorerIdentity[];
+}
+
 /** hex 字符串 → Uint8Array */
 export function hexToBytes(hex: string): Uint8Array {
   const clean = hex.length % 2 === 1 ? "0" + hex : hex;
@@ -125,6 +142,15 @@ export async function listPohs(
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`listPohs: HTTP ${res.status}`);
   return (await res.json()) as PohListInfo;
+}
+
+/**
+ * GET /v1/explorer — 全网身份聚合浏览（空 Verifier 返回空数组，不是 404）。
+ */
+export async function fetchExplorer(): Promise<ExplorerInfo> {
+  const res = await fetch(`${VERIFIER_URL}/v1/explorer`);
+  if (!res.ok) throw new Error(`fetchExplorer: HTTP ${res.status}`);
+  return (await res.json()) as ExplorerInfo;
 }
 
 /** GET /.well-known/verifier.json — 拉取 verifier 公钥 hex */

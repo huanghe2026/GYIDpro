@@ -38,7 +38,9 @@ fn full_collector_flow() {
     parsed.verify_self().expect("parsed chain self-verify");
 
     // 4) 链尾 hash 取出
-    let head = chain.block_hash_of_last().expect("non-empty chain has head");
+    let head = chain
+        .block_hash_of_last()
+        .expect("non-empty chain has head");
 
     // 5) 模拟 Verifier 下发 liveness challenge，Attester 签名响应
     let challenge = LivenessChallenge::new([0xAB; 16], [0xCD; 16], head, 2, 1_700_000_060);
@@ -97,7 +99,15 @@ fn extras_flow() {
     };
     let mut chain = Chain::new();
     chain
-        .collect_and_append(&id, 39.9042, 116.4074, 10, 1_700_000_000, true, Some(&extras))
+        .collect_and_append(
+            &id,
+            39.9042,
+            116.4074,
+            10,
+            1_700_000_000,
+            true,
+            Some(&extras),
+        )
         .unwrap();
     let bc = chain.last().unwrap();
     assert!(bc.meta.wifi_present);

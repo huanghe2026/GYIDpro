@@ -18,17 +18,20 @@
 //! - UI：SolidJS 在 `gyid-web/` 里写。
 
 #![forbid(unsafe_code)]
+// tsify 0.5 的 into_wasm_abi/from_wasm_abi 标记 deprecated（tsify#65，新 API 在
+// 更新大版本才有）；本 crate 已在浏览器端到端验证，暂不迁移，统一放行。
+#![allow(deprecated)]
 
 use gyid_shared::{
+    chain::Chain,
     collect_breadcrumb as shared_collect_breadcrumb,
     identity::Identity,
-    chain::Chain,
     liveness::sign_liveness_response as shared_sign_liveness,
     poh::{verify_poh as shared_verify_poh, PohInfo},
 };
 use serde::{Deserialize, Serialize};
-use trip_core::liveness::{LivenessChallenge, LivenessResponse};
 use trip_core::breadcrumb::Breadcrumb;
+use trip_core::liveness::{LivenessChallenge, LivenessResponse};
 use wasm_bindgen::prelude::*;
 
 // ============================================================================
@@ -297,6 +300,7 @@ pub fn h3_to_cell_hex(lat: f64, lng: f64, resolution: u8) -> Result<String, JsVa
 /// 表示创世（第一条）；否则取链尾的 index + block_hash。
 ///
 /// 返回的 `BreadcrumbJs.block_hash_hex` 即下一条的 `prev_block_hash_hex`。
+#[allow(clippy::too_many_arguments)] // JS API 边界，参数平铺便于调用
 #[wasm_bindgen]
 pub fn collect_breadcrumb(
     seed_hex: &str,
@@ -418,10 +422,7 @@ pub fn parse_liveness_challenge(cbor_hex: &str) -> Result<LivenessChallengeJs, J
 /// Attester 用身份密钥对挑战签名，返回 LivenessResponse CBOR hex。
 /// 直接通过实时 WS 通道回送 Verifier。
 #[wasm_bindgen]
-pub fn sign_liveness_response(
-    seed_hex: &str,
-    challenge_cbor_hex: &str,
-) -> Result<String, JsValue> {
+pub fn sign_liveness_response(seed_hex: &str, challenge_cbor_hex: &str) -> Result<String, JsValue> {
     let id = Identity::from_seed_hex(seed_hex).map_err(err_to_js)?;
     let bytes = hex::decode(challenge_cbor_hex.trim()).map_err(err_to_js)?;
     let challenge = LivenessChallenge::from_cbor(&bytes).map_err(err_to_js)?;

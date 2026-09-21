@@ -101,11 +101,7 @@ mod tests {
     use super::*;
     use trip_core::ProtocolKey;
 
-    fn fake_poh(
-        verifier: &ProtocolKey,
-        nonce: [u8; 16],
-        chain_head: [u8; 32],
-    ) -> Vec<u8> {
+    fn fake_poh(verifier: &ProtocolKey, nonce: [u8; 16], chain_head: [u8; 32]) -> Vec<u8> {
         PohCertificate::issue(
             verifier,
             [4u8; 32],

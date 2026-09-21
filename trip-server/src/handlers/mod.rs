@@ -8,6 +8,7 @@
 //! | POST | `/v1/poh` | RP | 凭 challenge_id 取 PoH 证书 CBOR |
 //! | GET  | `/v1/identity/:hex` | 任意 | 查询某 attester 的链统计（count/unique/head） |
 //! | GET  | `/v1/pohs?attester=<hex32>` | 任意 | 列出某 attester 已签发的 PoH challenge_id |
+//! | GET  | `/v1/explorer` | 任意 | 全网身份聚合浏览（Explorer 页数据源） |
 //! | GET  | `/v1/did/:did` | 任意 | `did:geoyuan` 解析 → W3C DID Document（`application/did+json`） |
 //! | GET  | `/v1/tit/:hex` | 任意 | Verifier 背书签发 TIT（统计量 + `tit_base64url`） |
 //! | GET  | `/.well-known/verifier.json` | 任意 | Verifier 公钥与策略 |
@@ -15,6 +16,7 @@
 pub mod challenge;
 pub mod did;
 pub mod evidence;
+pub mod explorer;
 pub mod identity;
 pub mod poh;
 pub mod pohs;
@@ -57,6 +59,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/poh", post(poh::fetch))
         .route("/v1/identity/:hex", get(identity::get))
         .route("/v1/pohs", get(pohs::list))
+        .route("/v1/explorer", get(explorer::overview))
         .route("/v1/did/:did", get(did::resolve))
         .route("/v1/tit/:hex", get(tit::issue))
         .route("/.well-known/verifier.json", get(well_known::meta))

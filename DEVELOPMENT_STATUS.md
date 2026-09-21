@@ -1,6 +1,6 @@
 # GeoYuan / TRIP 开发状态总览
 
-> **最后更新**: 2026-09-20
+> **最后更新**: 2026-09-21
 > **基于**: `docs/GYIP-0003-TRIP-GeoYuan-Dev-Plan.md` + 实际代码盘点
 >
 > **当前阶段**: W8 已闭合，W7/W9-W12 待开始
@@ -19,6 +19,15 @@
 | **gyid-wasm** | 浏览器 Attester 桥（tsify 生成 d.ts） | — |
 | **gyid-web** | SolidJS 演示页（Identity/Collect/Import/Verify/Certificates/Explorer） | — |
 | **gyid-android-rs / gyid-android** | UniFFI 安卓绑定雏形 | — |
+
+### W6 已完成详情：GyID 多前端三件套（W6 Phase 10 收尾）
+
+- **trip-server**：CORS（`TRIP_CORS_ORIGINS`）、`GET /v1/identity/:hex`、`GET /v1/pohs?attester=`、`GET /v1/explorer`（全网身份聚合，Explorer 页数据源）
+- **gyid-shared**：三端共享业务层，104+ 单测覆盖 identity round-trip / 面包屑签名 / 链校验 / PoH 验证
+- **gyid-wasm + gyid-web**：SolidJS SPA（Identity 多账户加密 / Collect 实时采集 / Verify 8 步状态机 / Certificates / Explorer），`pnpm build` + `tsc --noEmit` 全过
+- **gyid CLI（`gyid` 二进制）**：`init` / `collect` / `verify` / `poh-list` / `poh-show` 用户命令 + 高级命令分区
+- **gyid-android**：Compose 三屏（CollectService 前台采集 FusedLocation+WiFi+IMU、断点续传、VerifyScreen WS→签名→PoH 徽章），arm64-v8a + x86_64 双 ABI
+- **端到端 smoke**：wasm 算 H3 cell → CLI 签链 → POST /v1/evidence → identity/explorer 聚合一致（协议规则：连续同 cell 拒、间隔 <300s 拒、<900s 无 exploration 拒）
 
 ### W8 新增详情：链上锚定（GYIP-0003 §5.3）
 
@@ -72,7 +81,7 @@
 
 | 检查项 | 状态 |
 |--------|------|
-| `cargo test --workspace` | ✅ 127 测试全绿 |
+| `cargo test --workspace` | ✅ 137 测试全绿 |
 | `cargo clippy --workspace -D warnings` | ✅ 零警告 |
 | `cargo fmt --all --check` | ✅ 通过 |
 | 合约内存 EVM 测试 | ✅ 12/12 通过 |

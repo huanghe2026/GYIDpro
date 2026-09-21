@@ -169,10 +169,7 @@ impl VerifierClient {
 
     /// `GET /v1/pohs?attester=`：列出某 attester 已签发的 PoH challenge_id。
     pub async fn list_pohs(&self, attester_hex: &str) -> GyidResult<PohsList> {
-        let url = format!(
-            "{}/v1/pohs?attester={}",
-            self.base_url, attester_hex
-        );
+        let url = format!("{}/v1/pohs?attester={}", self.base_url, attester_hex);
         let resp = self
             .http
             .get(&url)

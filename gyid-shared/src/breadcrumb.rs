@@ -102,7 +102,9 @@ pub fn collect_breadcrumb(
         return Err(GyidError::BadInput(format!("latitude out of range: {lat}")));
     }
     if !(-180.0..=180.0).contains(&lng) {
-        return Err(GyidError::BadInput(format!("longitude out of range: {lng}")));
+        return Err(GyidError::BadInput(format!(
+            "longitude out of range: {lng}"
+        )));
     }
     let res = h3o::Resolution::try_from(h3_resolution)
         .map_err(|e| GyidError::H3(format!("resolution: {e}")))?;
@@ -223,14 +225,44 @@ mod tests {
         let id = fake_id();
         // 1_700_000_000 落在 bucket 5_666_666（[1_699_999_800, 1_700_000_100)）。
         // 50 秒后仍在同桶；h3 cell 也相同 → context digest 相同。
-        let bc1 = collect_breadcrumb(&id, 39.9042, 116.4074, 10, 1_700_000_000, 0, None, false, None)
-            .unwrap();
-        let bc2 = collect_breadcrumb(&id, 39.9042, 116.4074, 10, 1_700_000_050, 0, None, false, None)
-            .unwrap();
+        let bc1 = collect_breadcrumb(
+            &id,
+            39.9042,
+            116.4074,
+            10,
+            1_700_000_000,
+            0,
+            None,
+            false,
+            None,
+        )
+        .unwrap();
+        let bc2 = collect_breadcrumb(
+            &id,
+            39.9042,
+            116.4074,
+            10,
+            1_700_000_050,
+            0,
+            None,
+            false,
+            None,
+        )
+        .unwrap();
         assert_eq!(bc1.context_digest, bc2.context_digest);
         // 跨桶 → 不同
-        let bc3 = collect_breadcrumb(&id, 39.9042, 116.4074, 10, 1_700_000_300, 0, None, false, None)
-            .unwrap();
+        let bc3 = collect_breadcrumb(
+            &id,
+            39.9042,
+            116.4074,
+            10,
+            1_700_000_300,
+            0,
+            None,
+            false,
+            None,
+        )
+        .unwrap();
         assert_ne!(bc1.context_digest, bc3.context_digest);
     }
 }

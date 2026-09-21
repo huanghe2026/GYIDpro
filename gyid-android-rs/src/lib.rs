@@ -9,6 +9,9 @@
 //! - **无状态纯函数**：Identity / Chain 状态由 Kotlin 侧持有
 //! - **传输用 CBOR hex**：与 trip-server 端点对齐
 
+// UniFFI 生成代码（gyid.uniffi.rs）带空行的 doc comment 触发新 lint，此处统一放行
+#![allow(clippy::empty_line_after_doc_comments)]
+
 use gyid_shared::chain::Chain;
 use gyid_shared::{collect_breadcrumb, verify_poh as shared_verify_poh, Identity};
 use trip_core::liveness::{LivenessChallenge, LivenessResponse};
@@ -128,7 +131,7 @@ fn h3_to_cell(lat: f64, lng: f64, res: u8) -> Result<String, GyidError> {
 ///
 /// - `wifi_bssid_hex`：12 hex（6 字节 MAC，取信号最强 AP，BSSID 按信号排序后取首）；
 /// - `imu_digest_hex`：64 hex（加速度+陀螺仪向量串的 SHA-256）；
-/// 两者传 null 表示该分量缺失。
+///   两者传 null 表示该分量缺失。
 #[allow(clippy::too_many_arguments)] // FFI 边界，参数平铺便于 Kotlin 调用
 fn sign_breadcrumb(
     seed_hex: String,
@@ -202,10 +205,8 @@ fn sign_breadcrumb(
 /// 单条面包屑 CBOR hex → block_hash（64 hex），供端上续链。
 fn breadcrumb_block_hash(crumb_hex: String) -> Result<String, GyidError> {
     let bytes = decode_hex(&crumb_hex, crumb_hex.len() / 2, "crumb")?;
-    let bc = trip_core::Breadcrumb::from_cbor(&bytes).map_err(|e| {
-        GyidError::BadRequest {
-            detail: format!("parse breadcrumb: {e}"),
-        }
+    let bc = trip_core::Breadcrumb::from_cbor(&bytes).map_err(|e| GyidError::BadRequest {
+        detail: format!("parse breadcrumb: {e}"),
     })?;
     Ok(hex::encode(bc.block_hash()))
 }
@@ -219,19 +220,14 @@ fn verify_chain(hex_crumbs: String) -> Result<bool, GyidError> {
 }
 
 /// Attester 对 LivenessChallenge 签名，返回 LivenessResponse CBOR hex。
-fn sign_liveness_response(
-    seed_hex: String,
-    challenge_hex: String,
-) -> Result<String, GyidError> {
+fn sign_liveness_response(seed_hex: String, challenge_hex: String) -> Result<String, GyidError> {
     let identity = Identity::from_seed_hex(&seed_hex)?;
     let challenge_bytes = decode_hex(&challenge_hex, challenge_hex.len() / 2, "challenge")?;
-    let challenge = LivenessChallenge::from_cbor(&challenge_bytes).map_err(|e| {
-        GyidError::BadRequest {
+    let challenge =
+        LivenessChallenge::from_cbor(&challenge_bytes).map_err(|e| GyidError::BadRequest {
             detail: format!("parse challenge: {e}"),
-        }
-    })?;
-    let resp: LivenessResponse =
-        gyid_shared::sign_liveness_response(&identity, &challenge)?;
+        })?;
+    let resp: LivenessResponse = gyid_shared::sign_liveness_response(&identity, &challenge)?;
     Ok(hex::encode(resp.to_cbor()))
 }
 
@@ -253,14 +249,7 @@ fn verify_poh(
     let mut nonce = [0u8; 16];
     nonce.copy_from_slice(&nonce_bytes);
 
-    let info = shared_verify_poh(
-        &poh_bytes,
-        &vk,
-        &nonce,
-        now,
-        min_confidence,
-        min_trust,
-    )?;
+    let info = shared_verify_poh(&poh_bytes, &vk, &nonce, now, min_confidence, min_trust)?;
     Ok(PohInfo {
         fresh: info.fresh,
         policy: info.policy_pass,
@@ -337,14 +326,30 @@ mod tests {
     fn sign_rejects_bad_extras_hex() {
         // wifi 必须 6 字节（12 hex）
         assert!(sign_breadcrumb(
-            SEED.into(), 0, 1_700_000_000, 39.9, 116.4, 10, None, false,
-            Some("aabb".into()), None,
+            SEED.into(),
+            0,
+            1_700_000_000,
+            39.9,
+            116.4,
+            10,
+            None,
+            false,
+            Some("aabb".into()),
+            None,
         )
         .is_err());
         // imu 必须 32 字节（64 hex）
         assert!(sign_breadcrumb(
-            SEED.into(), 0, 1_700_000_000, 39.9, 116.4, 10, None, false,
-            None, Some("ab".into()),
+            SEED.into(),
+            0,
+            1_700_000_000,
+            39.9,
+            116.4,
+            10,
+            None,
+            false,
+            None,
+            Some("ab".into()),
         )
         .is_err());
     }
@@ -352,19 +357,13 @@ mod tests {
     #[test]
     fn liveness_roundtrip() {
         let identity = Identity::from_seed_hex(SEED).unwrap();
-        let challenge = LivenessChallenge::new(
-            [0xAB; 16],
-            [0xCD; 16],
-            [0xEF; 32],
-            7,
-            1_700_000_060,
-        );
+        let challenge =
+            LivenessChallenge::new([0xAB; 16], [0xCD; 16], [0xEF; 32], 7, 1_700_000_060);
         let ch_hex = hex::encode(challenge.to_cbor());
         let resp_hex = sign_liveness_response(SEED.into(), ch_hex).unwrap();
-        let resp = trip_core::liveness::LivenessResponse::from_cbor(
-            &hex::decode(&resp_hex).unwrap(),
-        )
-        .unwrap();
+        let resp =
+            trip_core::liveness::LivenessResponse::from_cbor(&hex::decode(&resp_hex).unwrap())
+                .unwrap();
         resp.verify_signature(&identity.protocol_key().public_bytes())
             .unwrap();
     }
