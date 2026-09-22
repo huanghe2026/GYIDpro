@@ -11,6 +11,8 @@
 // 3. EXIF DateTimeOriginal（**无时区**，按 UTC 解释并在 UI 提示）；
 // 4. 缺时间时按可配置间隔合成（默认 900s，§4.1 默认采集间隔）。
 
+import { t } from "../i18n";
+
 /** 一条候选轨迹点。 */
 export interface TrackPoint {
   lat: number;
@@ -72,13 +74,15 @@ export function parseGpx(
   const parseErr = doc.querySelector("parsererror");
   if (parseErr) {
     throw new Error(
-      `GPX 解析失败：${(parseErr.textContent ?? "XML 格式错误").trim().slice(0, 120)}`,
+      t("imp.errGpxParse", {
+        e: (parseErr.textContent ?? t("imp.errXml")).trim().slice(0, 120),
+      }),
     );
   }
 
   const nodes = Array.from(doc.querySelectorAll("trkpt, rtept, wpt"));
   if (nodes.length === 0) {
-    throw new Error("未在文件中找到 trkpt / rtept / wpt 轨迹点");
+    throw new Error(t("imp.errNoTrackPoints"));
   }
 
   interface Raw {
@@ -111,7 +115,7 @@ export function parseGpx(
   }
 
   if (raw.length === 0) {
-    throw new Error("轨迹点均缺少合法的 lat/lon");
+    throw new Error(t("imp.errNoValidLatLon"));
   }
 
   const known = raw
@@ -376,7 +380,7 @@ export async function parsePhotoFiles(
     try {
       const gps = await readJpegGps(file);
       if (!gps) {
-        failed.push({ name: file.name, reason: "无 GPS EXIF（或非 JPEG）" });
+        failed.push({ name: file.name, reason: t("imp.errNoGps") });
         continue;
       }
       points.push({

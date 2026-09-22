@@ -17,6 +17,7 @@ import {
   listPohs,
 } from "../lib/verifier";
 import { loadWasm, type PohInfoJs } from "../lib/wasm";
+import { fmtDateTime, fmtTime, t } from "../i18n";
 
 /** 策略门槛（与 trip-server Config::default 对齐） */
 const MIN_CONFIDENCE = 0.1;
@@ -33,14 +34,15 @@ interface CertEntry {
   error?: string;
 }
 
-/** 徽章：kind + 文案 */
+/** 徽章：kind + 文案（t() 在渲染跟踪域内调用，随语言切换更新）。 */
 function badge(info: PohInfoJs): { cls: string; text: string } {
-  if (info.is_trusted) return { cls: "bg-green-100 text-green-800", text: "Fresh + PASS" };
+  if (info.is_trusted)
+    return { cls: "bg-green-100 text-green-800", text: t("certificates.badgePass") };
   if (info.fresh && !info.policy_pass)
-    return { cls: "bg-amber-100 text-amber-800", text: "Fresh，策略未过" };
+    return { cls: "bg-amber-100 text-amber-800", text: t("certificates.badgeFreshPolicyFail") };
   if (!info.fresh && info.policy_pass)
-    return { cls: "bg-amber-100 text-amber-800", text: "已过期" };
-  return { cls: "bg-red-100 text-red-800", text: "Stale / FAIL" };
+    return { cls: "bg-amber-100 text-amber-800", text: t("certificates.badgeExpired") };
+  return { cls: "bg-red-100 text-red-800", text: t("certificates.badgeStale") };
 }
 
 export default function Certificates() {
@@ -98,14 +100,13 @@ function CertificatesInner() {
           disabled={loading()}
           onClick={() => void certsActions.refetch()}
         >
-          {loading() ? "加载中…" : "刷新"}
+          {loading() ? t("certificates.loadingList") : t("common.refresh")}
         </button>
       </div>
 
       <Show when={!loading() && certs()?.length === 0}>
         <div class="bg-white rounded-lg shadow p-6 text-sm text-gray-500">
-          该身份还没有 PoH 证书。先在 <b>Collect</b> 页采集并上传面包屑，再到{" "}
-          <b>Verify</b> 页发起一次 Active Verification。
+          {t("certificates.empty")}
         </div>
       </Show>
 
@@ -121,7 +122,7 @@ function CertificatesInner() {
                       challenge_id: {entry.challengeId}
                     </p>
                     <p class="text-sm text-red-600 mt-1 break-all">
-                      取回失败：{entry.error}
+                      {t("certificates.fetchFail", { e: entry.error ?? "" })}
                     </p>
                   </div>
                 }
@@ -139,23 +140,23 @@ function CertificatesInner() {
                   </div>
                   <dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-sm mt-3">
                     <div>
-                      <dt class="text-xs text-gray-500">签发</dt>
-                      <dd>{new Date(entry.info!.issued_at * 1000).toLocaleString()}</dd>
+                      <dt class="text-xs text-gray-500">{t("certificates.dtIssued")}</dt>
+                      <dd>{fmtDateTime(entry.info!.issued_at * 1000)}</dd>
                     </div>
                     <div>
-                      <dt class="text-xs text-gray-500">有效期至</dt>
+                      <dt class="text-xs text-gray-500">{t("certificates.dtValidUntil")}</dt>
                       <dd>
-                        {new Date((entry.info!.issued_at + entry.info!.validity_secs) * 1000).toLocaleTimeString()}
+                        {fmtTime(entry.info!.issued_at + entry.info!.validity_secs)}
                       </dd>
                     </div>
                     <div>
-                      <dt class="text-xs text-gray-500">面包屑 / cell</dt>
+                      <dt class="text-xs text-gray-500">{t("certificates.dtCrumbs")}</dt>
                       <dd class="font-mono">
                         {entry.info!.breadcrumb_count} / {entry.info!.unique_cells}
                       </dd>
                     </div>
                     <div>
-                      <dt class="text-xs text-gray-500">trust / conf / α</dt>
+                      <dt class="text-xs text-gray-500">{t("certificates.dtMetrics")}</dt>
                       <dd class="font-mono">
                         {entry.info!.trust.toFixed(3)} / {entry.info!.criticality_confidence.toFixed(3)} / {entry.info!.alpha.toFixed(3)}
                       </dd>

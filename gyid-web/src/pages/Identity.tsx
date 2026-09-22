@@ -16,11 +16,16 @@ import {
   unlock,
 } from "../stores/identity";
 import { fetchIdentity } from "../lib/verifier";
+import {
+  explorerAddressUrl,
+  fetchChainIdentity,
+  registryAddress,
+  registryConfigured,
+} from "../lib/registry";
+import { fmtDateTime, t } from "../i18n";
 
 const short = (h: string) =>
   h.length > 20 ? `${h.slice(0, 10)}…${h.slice(-8)}` : h;
-const formatMs = (ms: number) => new Date(ms).toLocaleString();
-const formatTs = (sec: number) => new Date(sec * 1000).toLocaleString();
 
 export default function Identity() {
   // ----- 新建身份表单 -----
@@ -42,14 +47,23 @@ export default function Identity() {
     async (pk) => (pk ? fetchIdentity(pk) : null),
   );
 
+  // GeoTITRegistry 链上登记状态（仅在配置了合约地址时启用）
+  const [chain, chainActions] = createResource(
+    () =>
+      registryConfigured() && identityStore.session?.pubkeyHex
+        ? identityStore.session.pubkeyHex
+        : null,
+    async (pk) => fetchChainIdentity(pk),
+  );
+
   const submitCreate = async () => {
     setFormErr(null);
     if (pass().length < 6) {
-      setFormErr("passphrase 至少 6 位");
+      setFormErr(t("identity.passTooShort"));
       return;
     }
     if (pass() !== pass2()) {
-      setFormErr("两次输入的 passphrase 不一致");
+      setFormErr(t("identity.passMismatch"));
       return;
     }
     try {
@@ -59,7 +73,7 @@ export default function Identity() {
       setPass("");
       setPass2("");
     } catch {
-      setFormErr(identityStore.error ?? "创建失败");
+      setFormErr(identityStore.error ?? t("identity.createFail"));
     }
   };
 
@@ -71,7 +85,7 @@ export default function Identity() {
       await unlock(acc.id, unlockPass());
       setUnlockPass("");
     } catch {
-      setUnlockErr("解锁失败，请检查 passphrase");
+      setUnlockErr(t("unlock.failed"));
     }
   };
 
@@ -91,31 +105,31 @@ export default function Identity() {
           class="bg-blue-600 text-white text-sm rounded px-3 py-2 hover:bg-blue-700"
           onClick={() => setShowCreate((v) => !v)}
         >
-          {showCreate() ? "取消" : "+ 新建身份"}
+          {showCreate() ? t("common.cancel") : t("identity.newBtn")}
         </button>
       </div>
 
       {/* 新建身份表单 */}
       <Show when={showCreate()}>
         <div class="bg-white rounded-lg shadow p-6 space-y-3 max-w-lg">
-          <h2 class="font-semibold">新建身份</h2>
+          <h2 class="font-semibold">{t("identity.createTitle")}</h2>
           <input
             class="w-full border rounded px-3 py-2 text-sm"
-            placeholder="标签（可选，如 phone / laptop）"
+            placeholder={t("identity.labelPlaceholder")}
             value={label()}
             onInput={(e) => setLabel(e.currentTarget.value)}
           />
           <input
             type="password"
             class="w-full border rounded px-3 py-2 text-sm"
-            placeholder="passphrase（至少 6 位）"
+            placeholder={t("identity.passPlaceholder")}
             value={pass()}
             onInput={(e) => setPass(e.currentTarget.value)}
           />
           <input
             type="password"
             class="w-full border rounded px-3 py-2 text-sm"
-            placeholder="再输一遍 passphrase"
+            placeholder={t("identity.pass2Placeholder")}
             value={pass2()}
             onInput={(e) => setPass2(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && submitCreate()}
@@ -128,7 +142,7 @@ export default function Identity() {
             disabled={identityStore.busy}
             onClick={submitCreate}
           >
-            {identityStore.busy ? "生成中…" : "生成并加密保存"}
+            {identityStore.busy ? t("identity.generating") : t("identity.createSubmit")}
           </button>
         </div>
       </Show>
@@ -142,18 +156,18 @@ export default function Identity() {
                 <h2 class="font-semibold text-lg">
                   {activeAccount()?.label ?? "default"}
                 </h2>
-                <p class="text-xs text-green-700 mt-0.5">● 已解锁（seed 仅在内存）</p>
+                <p class="text-xs text-green-700 mt-0.5">{t("identity.unlockedTag")}</p>
               </div>
               <button
                 class="text-sm border rounded px-3 py-1.5 hover:bg-gray-50"
                 onClick={lock}
               >
-                锁定
+                {t("console.lock")}
               </button>
             </div>
 
             <div>
-              <div class="text-xs text-gray-500 mb-1">Attester 公钥（pubkey hex）</div>
+              <div class="text-xs text-gray-500 mb-1">{t("identity.pubkeyLabel")}</div>
               <div class="flex items-center gap-2">
                 <code class="text-xs bg-gray-100 rounded px-2 py-1.5 break-all flex-1">
                   {session().pubkeyHex}
@@ -162,7 +176,7 @@ export default function Identity() {
                   class="text-sm border rounded px-2.5 py-1.5 hover:bg-gray-50 shrink-0"
                   onClick={copyPubkey}
                 >
-                  {copied() ? "已复制" : "复制"}
+                  {copied() ? t("common.copied") : t("common.copy")}
                 </button>
               </div>
             </div>
@@ -170,40 +184,106 @@ export default function Identity() {
             {/* 链上统计：GET /v1/identity/:hex */}
             <div>
               <div class="flex items-center justify-between mb-2">
-                <div class="text-xs text-gray-500">Verifier 链上状态</div>
+                <div class="text-xs text-gray-500">{t("identity.chainStatus")}</div>
                 <button
                   class="text-xs text-blue-600 hover:underline"
                   onClick={() => statsActions.refetch()}
                 >
-                  刷新
+                  {t("common.refresh")}
                 </button>
               </div>
               <Show
                 when={!stats.loading}
-                fallback={<p class="text-sm text-gray-500">加载中…</p>}
+                fallback={<p class="text-sm text-gray-500">{t("common.loading")}</p>}
               >
                 <Show when={stats.error}>
                   <p class="text-sm text-red-600">
-                    无法连接 Verifier：{stats.error?.message}（确认 trip-server 已启动）
+                    {t("identity.connFail", { msg: stats.error?.message ?? "" })}
                   </p>
                 </Show>
                 <Show when={!stats.error && stats()}>
                   {(info) => (
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Stat label="面包屑总数" value={String(info().breadcrumb_count)} />
-                      <Stat label="唯一 H3 cell" value={String(info().unique_cells)} />
-                      <Stat label="链头 hash" value={short(info().chain_head)} mono />
-                      <Stat label="最后时间戳" value={formatTs(info().last_ts)} />
+                      <Stat label={t("identity.statCount")} value={String(info().breadcrumb_count)} />
+                      <Stat label={t("identity.statCells")} value={String(info().unique_cells)} />
+                      <Stat label={t("identity.statHead")} value={short(info().chain_head)} mono />
+                      <Stat label={t("identity.statLast")} value={fmtDateTime(info().last_ts * 1000)} />
                     </div>
                   )}
                 </Show>
                 <Show when={!stats.error && stats() === null}>
                   <p class="text-sm text-gray-500">
-                    Verifier 上还没有这个身份的证据 —— 去 Collect 页采集并上传第一组面包屑。
+                    {t("identity.noEvidence")}
                   </p>
                 </Show>
               </Show>
             </div>
+
+            {/* GeoTITRegistry 链上登记（配置了 VITE_REGISTRY_ADDRESS 才显示） */}
+            <Show when={registryConfigured()}>
+              <div class="border-t pt-4">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="text-xs text-gray-500">
+                    {t("identity.onchain.title")}
+                  </div>
+                  <button
+                    class="text-xs text-blue-600 hover:underline"
+                    onClick={() => chainActions.refetch()}
+                  >
+                    {t("common.refresh")}
+                  </button>
+                </div>
+                <Show
+                  when={!chain.loading}
+                  fallback={
+                    <p class="text-sm text-gray-500">
+                      {t("identity.onchain.loading")}
+                    </p>
+                  }
+                >
+                  <Show when={chain.error}>
+                    <p class="text-sm text-red-600">
+                      {t("identity.onchain.error")}
+                    </p>
+                  </Show>
+                  <Show when={!chain.error && chain() && !chain()!.registered}>
+                    <p class="text-sm text-gray-500">
+                      {t("identity.onchain.unregistered")}
+                    </p>
+                  </Show>
+                  <Show when={!chain.error && chain()?.registered}>
+                    <div>
+                      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <Stat
+                          label={t("identity.onchain.registeredAt")}
+                          value={fmtDateTime(chain()!.registeredAt * 1000)}
+                        />
+                        <Stat
+                          label={t("identity.onchain.epochs")}
+                          value={String(chain()!.epochCount)}
+                        />
+                        <Stat
+                          label={t("identity.onchain.cells")}
+                          value={String(chain()!.lastUniqueCells)}
+                        />
+                        <Stat
+                          label={t("identity.onchain.handle")}
+                          value={chain()!.handle || t("identity.onchain.handleNone")}
+                        />
+                      </div>
+                      <a
+                        class="inline-block mt-2 text-xs text-blue-600 hover:underline"
+                        href={explorerAddressUrl(registryAddress())}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t("identity.onchain.view")} ↗
+                      </a>
+                    </div>
+                  </Show>
+                </Show>
+              </div>
+            </Show>
           </div>
         )}
       </Show>
@@ -214,7 +294,7 @@ export default function Identity() {
       >
         <div class="bg-white rounded-lg shadow p-6 max-w-lg space-y-3">
           <h2 class="font-semibold">
-            解锁「{activeAccount()?.label}」
+            {t("identity.unlockTitle", { label: activeAccount()?.label ?? "" })}
           </h2>
           <input
             type="password"
@@ -232,7 +312,7 @@ export default function Identity() {
             disabled={identityStore.busy || !unlockPass()}
             onClick={submitUnlock}
           >
-            {identityStore.busy ? "解锁中…" : "解锁"}
+            {identityStore.busy ? t("identity.unlocking") : t("unlock.btn")}
           </button>
         </div>
       </Show>
@@ -240,13 +320,13 @@ export default function Identity() {
       {/* 全部本地账户 */}
       <div>
         <h2 class="font-semibold mb-3 text-sm text-gray-600">
-          本地账户（{identityStore.accounts.length}）
+          {t("identity.localAccounts", { n: identityStore.accounts.length })}
         </h2>
         <Show
           when={identityStore.accounts.length > 0}
           fallback={
             <p class="text-sm text-gray-500 bg-white rounded-lg shadow p-6">
-              暂无账户，点击右上角「+ 新建身份」开始。
+              {t("identity.noAccounts")}
             </p>
           }
         >
@@ -260,10 +340,10 @@ export default function Identity() {
                   <div class="min-w-0">
                     <div class="font-medium text-sm truncate">{acc.label}</div>
                     <div class="text-xs text-gray-500">
-                      创建于 {formatMs(acc.createdAt)}
+                      {t("identity.createdAt", { date: fmtDateTime(acc.createdAt) })}
                     </div>
                     <Show when={acc.id === identityStore.session?.id}>
-                      <div class="text-xs text-green-700 mt-0.5">已解锁</div>
+                      <div class="text-xs text-green-700 mt-0.5">{t("identity.unlocked")}</div>
                     </Show>
                   </div>
                   <div class="flex gap-1.5 shrink-0">
@@ -272,22 +352,18 @@ export default function Identity() {
                         class="text-xs border rounded px-2 py-1 hover:bg-gray-50"
                         onClick={() => selectAccount(acc.id)}
                       >
-                        切换
+                        {t("identity.switch")}
                       </button>
                     </Show>
                     <button
                       class="text-xs border rounded px-2 py-1 text-red-600 hover:bg-red-50"
                       onClick={() => {
-                        if (
-                          confirm(
-                            `删除账户「${acc.label}」？加密记录将从本机移除（不可恢复）。`,
-                          )
-                        ) {
+                        if (confirm(t("identity.deleteConfirm", { label: acc.label }))) {
                           removeAccount(acc.id);
                         }
                       }}
                     >
-                      删除
+                      {t("common.delete")}
                     </button>
                   </div>
                 </div>

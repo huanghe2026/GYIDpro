@@ -9,6 +9,7 @@
 import { createStore } from "solid-js/store";
 import { loadJson, saveJson } from "../lib/storage";
 import { loadWasm } from "../lib/wasm";
+import { t } from "../i18n";
 
 const ACCOUNTS_KEY = "gyid.accounts";
 const ACTIVE_KEY = "gyid.activeId";
@@ -91,7 +92,7 @@ export async function createIdentity(
     saveJson(ACTIVE_KEY, acc.id);
     return session;
   } catch (e) {
-    setState({ error: `创建身份失败：${String(e)}` });
+    setState({ error: t("errors.identityCreate", { e: String(e) }) });
     throw e;
   } finally {
     setState({ busy: false });
@@ -104,7 +105,7 @@ export async function unlock(
   passphrase: string,
 ): Promise<UnlockedSession> {
   const acc = state.accounts.find((a) => a.id === id);
-  if (!acc) throw new Error("账户不存在");
+  if (!acc) throw new Error(t("errors.accountNotFound"));
   setState({ busy: true, error: null });
   try {
     const wasm = await loadWasm();
@@ -118,7 +119,7 @@ export async function unlock(
     saveJson(ACTIVE_KEY, id);
     return session;
   } catch (e) {
-    setState({ error: "解锁失败：passphrase 错误或加密数据损坏" });
+    setState({ error: t("errors.identityUnlock") });
     throw e;
   } finally {
     setState({ busy: false });

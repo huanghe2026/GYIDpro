@@ -1,0 +1,687 @@
+// 中文词典（源语言）。en.ts 必须满足相同结构（satisfies Dict）。
+export const zh = {
+  meta: {
+    title: "Geoyuan ID（GyID）— 用真实轨迹证明你是真人",
+  },
+
+  common: {
+    cancel: "取消",
+    refresh: "刷新",
+    loading: "加载中…",
+    copy: "复制",
+    copied: "已复制",
+    delete: "删除",
+  },
+
+  nav: {
+    home: "首页",
+    protocol: "协议",
+    architecture: "架构",
+    console: "控制台",
+  },
+
+  footer: {
+    implTitle: "GyID · TRIP 实现",
+    implBodyPre: "基于 IETF 互联网草案",
+    implBodyPost:
+      "的轨迹身份开源实现：面包屑证明链、主动验证与人类存在证明（PoH）。",
+    resources: "资源",
+    protocolPrimer: "协议科普",
+    archApi: "系统架构与 Verifier API",
+    publicExplorer: "公开身份浏览器",
+    statusTitle: "状态声明",
+    statusBody:
+      "TRIP 仍为 IETF Internet-Draft（非正式 RFC），本项目仅供研究与实验，不应用于生产安全决策。",
+  },
+
+  home: {
+    hero: {
+      eyebrow: "基于 IETF TRIP 协议 · 人类存在证明",
+      brand: "Geoyuan ID",
+      chip: "简称 GyID",
+      tagline: "用你真实走过的路，证明你是真人",
+      sub: "Geoyuan ID 是一枚无法伪造、无法买卖、也不会泄露位置的真人身份。不必上传证件、不必刷脸、不必设置密码——只要你在真实世界里持续地生活和移动。",
+      ctaGet: "获取我的 Geoyuan ID",
+      ctaHow: "它如何工作",
+      badges: [
+        "无需证件 · 人脸 · 密码",
+        "原始位置永不上传",
+        "一人一号，防女巫",
+        "区块链上可查验",
+      ],
+    },
+    features: {
+      title: "为什么 Geoyuan ID 不一样",
+      cards: [
+        {
+          title: "只有真人能拥有",
+          body: "机器人可以一夜注册一万个账号，却伪造不出一条真实生活的轨迹：人的移动带有独特的统计物理规律，脚本批量生成的位移一眼可辨。",
+        },
+        {
+          title: "你的位置永远不上传",
+          body: "轨迹在设备本地被量化成不可逆的网格编号，链上只出现统计特征。连 Geoyuan 验证方也无法还原你去过哪里、住在哪里。",
+        },
+        {
+          title: "没法买、没法借、没法代持",
+          body: "每次证明都绑定一次性实时挑战，只有轨迹现场的设备能即时应答。截图、录屏、把账号转给别人，统统无效。",
+        },
+        {
+          title: "不绑姓名，也不用注册",
+          body: "身份只是设备自己生成的一对密钥。没有手机号、没有实名认证——服务方知道的是「一个真人」，而不是「你是谁」。",
+        },
+      ],
+    },
+    obtain: {
+      eyebrow: "如何获取",
+      title: "四步，拿到你的 Geoyuan ID",
+      items: [
+        {
+          n: "01",
+          title: "创建身份",
+          body: "在浏览器或手机里本地生成密钥，你的 Geoyuan ID 即刻诞生。无需注册，数据只存在你自己的设备上。",
+          cta: "打开 Identity",
+          href: "/console/identity",
+        },
+        {
+          n: "02",
+          title: "积累轨迹",
+          body: "日常走路时打开采集，或导入运动 App 的 GPX 轨迹、带定位的照片，形成一串只有你能签名的「面包屑」。约 200 条即可达到高置信判定。",
+          cta: "去采集",
+          href: "/console/collect",
+        },
+        {
+          n: "03",
+          title: "通过主动验证",
+          body: "验证方下发一次性加密挑战，确认此刻拿着设备的人就在轨迹现场，并评估轨迹的真人特征。",
+          cta: "发起验证",
+          href: "/console/verify",
+        },
+        {
+          n: "04",
+          title: "领取证书并上链",
+          body: "通过后收到验证方签名的人类存在证明（PoH）；身份的存在性与轨迹链摘要被锚定到区块链，任何人都可独立查验。",
+          cta: "查看我的证书",
+          href: "/console/certificates",
+        },
+      ],
+      note: "所有密码学操作都在你的浏览器内完成。你不需要购买任何加密货币——上链的 gas 由平台代付。",
+      cta: "立即获取（免费）",
+    },
+    onchain: {
+      eyebrow: "链上锚定",
+      title: "上链只锚「存在」，不锚「位置」",
+      desc: "区块链不是用来存轨迹的。链上只登记三类可以公开的信息——足以证明身份存在，却看不出你去过哪里：",
+      cards: [
+        {
+          title: "身份登记",
+          body: "公钥与 DID 首次写定、永不可替换，从根上杜绝身份被调包。",
+        },
+        {
+          title: "周期锚定",
+          body: "每隔一段时间把轨迹链的 Merkle 根和唯一网格数上链；链下凭密码学验证真伪，链上没有任何坐标。",
+        },
+        {
+          title: "专属 Handle",
+          body: "累计 ≥100 条面包屑、信任分达标后，可声明唯一展示名（如 gyid/huanghe）：一次声明、全网唯一、无法抢注。",
+        },
+      ],
+      points: [
+        "平台代付 gas，用户零持币",
+        "GPS 坐标、照片、网格明细永不上链",
+        "链上只是索引；真伪始终由端上密码学验证",
+      ],
+      network: "当前运行于 Base Sepolia 测试网；主网部署与安全审计完成后迁移至主网。",
+      cta: "了解技术架构",
+    },
+    platforms: {
+      title: "哪里可以使用",
+      cards: [
+        {
+          name: "网页版",
+          desc: "就是这个网站：创建身份、采集轨迹、发起验证、查收证书，全部在浏览器完成。",
+          status: "可用",
+        },
+        {
+          name: "Android 手机",
+          desc: "前台服务持续记录，息屏、断网也能积累轨迹，联网后自动续传。",
+          status: "源码就绪",
+        },
+        {
+          name: "命令行",
+          desc: "面向开发者与自动化：identity / collect / verify / anchor 全套指令。",
+          status: "可用",
+        },
+      ],
+      link: "查看系统架构与 API →",
+    },
+    final: {
+      title: "下一次证明「我是真人」，不用再掏出证件",
+      sub: "你需要的只是一个浏览器，和一条真实走过的路。剩下的，交给密码学。",
+      cta: "获取我的 Geoyuan ID",
+    },
+  },
+
+  protocol: {
+    header: {
+      eyebrow: "IETF RATS WG · Internet-Draft（独立提交）",
+      title: "TRIP：基于轨迹的身份证明",
+      introPre:
+        "Trajectory-based Recognition of Identity Proof——由 Camilo Ayerbe Posada（ULISSY s.r.l.）与 M. Usama Sardar（TU Dresden）撰写的密码学 + 人类移动行为身份认证协议。GyID 是该草案",
+      introHl: " draft-04 版本的开源工程实现",
+      introPost: "。",
+      noticePre: "注意：TRIP 是正在迭代的互联网草案，",
+      noticeBold: "尚未成为正式 RFC",
+      noticePost:
+        "，随时可能修改或废弃，无大规模生产部署；本项目仅供研究与实验。",
+    },
+    background: {
+      eyebrow: "BACKGROUND",
+      title: "核心思路：轨迹不可伪造",
+      p1Pre:
+        "传统线上验证依赖证件、人脸、密码，存在单点泄露、深度伪造、重放与 Sybil 女巫攻击。TRIP 提出完全不同的路径：",
+      p1Hl: "把人在现实世界持续的物理移动轨迹，作为「真人存在」的证明。",
+      p2: "其理论根基来自两项研究：",
+      li1:
+        "Giorgio Parisi（诺贝尔物理学奖）关于生物系统无标度关联与自组织临界（SOC）的研究；",
+      li2Pre: "Albert-László Barabási 团队对人类移动模式的研究：人类位移服从",
+      li2Hl: "截断莱维飞行（Truncated Lévy flights）",
+      li2Post: "，具有独特的 1/f 粉红噪声功率谱特征，脚本合成轨迹很难复现。",
+    },
+    timeline: {
+      eyebrow: "TIMELINE",
+      title: "草案版本演进",
+      implementedBadge: "GyID 实现版本",
+      items: [
+        {
+          v: "-01",
+          date: "2026 年初",
+          title: "首次提交",
+          body:
+            "引入 Criticality Engine（临界引擎），将 Parisi 与 Barabási 的统计物理模型作为核心判别器，区分生物移动与合成轨迹。",
+        },
+        {
+          v: "-02",
+          date: "2026-02-09",
+          title: "映射 RATS + 主动验证",
+          body:
+            "正式映射到 RATS 架构（RFC 9334）；新增主动验证协议（Active Verification），修复隐私模型；此版仍保留被动验证。",
+        },
+        {
+          v: "-03",
+          date: "2026-05-07",
+          title: "统计物理评审后的大修订",
+          body:
+            "「Parisi 因子」改为标准谱分析术语 PSD 缩放指数 α；补齐 Lévy β 与 α 的数学推导；给出最小采样点收敛分析；彻底删除被动模式，所有证明绑定 RP nonce，杜绝重放。",
+        },
+        {
+          v: "-04",
+          date: "2026-05-08",
+          title: "当前实现版本",
+          body:
+            "附录横向对比 EAT 位置声明、Proximate Location、可验证地理围栏、PoP 等方案；编辑勘误。文档有效期至 2026-11-09。GyID 当前即按本版实现。",
+        },
+      ],
+    },
+    roles: {
+      eyebrow: "RATS ROLES",
+      title: "三方角色（RFC 9334 模型）",
+      items: [
+        {
+          en: "Attester",
+          cn: "证明方（手机）",
+          body:
+            "本地采集 GNSS/IMU、H3 量化、签名面包屑链，并在主动验证中对实时挑战做签名应答。",
+        },
+        {
+          en: "Verifier",
+          cn: "验证方（临界引擎）",
+          body:
+            "校验面包屑签名与哈希链，运行统计物理评估（α / β / 置信度），签发 PoH 证书。GyID 中由 trip-server 实现。",
+        },
+        {
+          en: "Relying Party",
+          cn: "依赖方（业务服务）",
+          body:
+            "提供一次性 nonce 发起验证，消费 PoH/TIT 做出业务决策，例如投票防女巫、远程考勤。",
+        },
+      ],
+    },
+    glossary: {
+      eyebrow: "GLOSSARY",
+      title: "核心概念速查",
+      items: [
+        ["Breadcrumb", "面包屑：一个时间窗口的轨迹证据片段，含 H3 cell、时间戳、环境证据与设备签名，前一片段哈希入链。"],
+        ["H3", "Uber 开源的六边形地球网格，分辨率 0–15。TRIP 用它在设备本地对经纬度做不可逆有损量化（draft §2.1 MUST）。"],
+        ["PoH", "Proof-of-Humanity，人类存在证明证书：Verifier 签名、绑定 RP nonce、短有效期，只携带统计参数。"],
+        ["TIT", "Trajectory Identity Token，轨迹身份令牌：基于长期轨迹的伪匿名身份标识，不绑定现实姓名。"],
+        ["DID", "TRIP 身份：设备自生成的 Ed25519 密钥对，公钥即标识，无需注册机构。"],
+        ["α / β", "PSD 缩放指数 α 与截断莱维飞行指数 β：刻画 1/f 粉红噪声与人类位移分布的统计量，临界引擎的核心判据。"],
+        ["Active Verification", "主动验证：RP nonce + Verifier 实时挑战 + 即时应答，证明「此刻在轨迹现场」。draft-03 起为唯一模式。"],
+      ],
+    },
+    privacy: {
+      eyebrow: "PRIVACY",
+      title: "隐私设计要点",
+      items: [
+        {
+          pre: "原始 GPS 坐标在设备本地用 H3 网格量化，不可逆有损压缩，",
+          hl: "原始坐标不外传",
+          post: "；",
+        },
+        {
+          pre: "对外交付的 PoH 证书只含统计参数（α、β、可信度分数），",
+          hl: "不含任何地理位置",
+          post: "；",
+        },
+        "支持多个独立验证方，依赖方可自行选择信任节点；",
+        "协议传输无关，不绑定特定区块链或域名系统，可独立运行。",
+      ],
+    },
+    limitations: {
+      eyebrow: "LIMITATIONS",
+      title: "已知局限",
+      items: [
+        "机器人/无人机搭载手机模拟 GPS+IMU 是最难防御的攻击，仍属开放研究问题；",
+        "需要足够样本：至少约 200 条面包屑才能得到高置信度判定，短轨迹易误判；",
+        "对行动不便、长期静止用户内置适配方案，以时序连续性替代空间移动要求；",
+        "不内置人名绑定，输出的是伪匿名 TIT，不直接关联现实身份。",
+      ],
+    },
+    usecases: {
+      eyebrow: "USE CASES",
+      title: "预期应用场景",
+      items: [
+        "DAO / 链上投票 / 空投的防女巫（Proof-of-Humanity）",
+        "远程考试、劳务平台的跨时间持续活体核验",
+        "金融与政务账号的身份连续性第二因子",
+        "隐私优先的地理可信服务（区域权益、访问权限）",
+        "物联网 / 车联网中人类操作者与自动设备的行为区分",
+      ],
+      notePre: "TRIP ",
+      noteHl: "不是一次性位置证明",
+      notePost:
+        "，核心价值是时序连续的移动行为统计证明；与 EAT、PoP 等单点位置证明协议互为补充而非替代。上述场景多为草案设想，公开大规模落地案例极少。",
+    },
+  },
+
+  architecture: {
+    header: {
+      eyebrow: "ENGINEERING",
+      title: "系统架构",
+      intro:
+        "协议逻辑只写一次（Rust），经编译/绑定分发到三端；Verifier 以无状态友好的 HTTP + WebSocket 暴露服务。传输与区块链无关，链上锚定为可选层。",
+    },
+    dataflow: {
+      eyebrow: "DATA FLOW",
+      title: "一次证明的生命周期",
+      items: [
+        "Attester 端生成 Ed25519 身份（DID），持续采集并签名面包屑，本地维护哈希链；",
+        "面包屑以确定性 CBOR 帧分批 POST 到 Verifier，服务端执行间隔/重复 cell/探索模式等链规则校验；",
+        "RP 用自己的随机 nonce 调 POST /v1/verify；Attester 经 WS 接收挑战并在链头现场签名应答；",
+        "Verifier 复算统计物理指标（α、β、置信度）并检查链完整性，通过则签发 PoH；",
+        "RP 轮询取得 PoH CBOR，用 Verifier 公钥与自己的 nonce 在本地校验新鲜度与策略门槛；",
+        "可选：将 TIT 与链摘要写入 GeoTITRegistry 合约，供链上应用防女巫查询。",
+      ],
+    },
+    modules: {
+      eyebrow: "MODULES",
+      title: "组件地图",
+      crates: [
+        {
+          name: "trip-core",
+          lang: "Rust",
+          role: "协议核心",
+          body: "draft-04 原语：确定性 CBOR 编解码、breadcrumb 签名/校验、哈希链、PoH 证书签发与验证、DID、H3 量化辅助。无平台依赖，70+ 单测。",
+        },
+        {
+          name: "gyid-shared",
+          lang: "Rust",
+          role: "共享业务层",
+          body: "三端共用：身份生成与加密存储（PBKDF2+AES-GCM）、采集封装、链管理、Verifier 客户端、PoH 策略校验。feature gate 区分 wasm / native。",
+        },
+        {
+          name: "trip-server",
+          lang: "Rust / Axum",
+          role: "Verifier 服务",
+          body: "RATS 验证方：证据合并校验、主动验证挑战（WebSocket）、临界引擎评估、PoH 签发、DID/TIT、Explorer 聚合；内存存储，CORS 可配。",
+        },
+        {
+          name: "gyid-wasm",
+          lang: "Rust → WASM",
+          role: "浏览器桥",
+          body: "wasm-bindgen + serde-wasm-bindgen + tsify，把共享核心编译为 wasm32 并自动生成 TypeScript 类型。",
+        },
+        {
+          name: "gyid-web",
+          lang: "SolidJS + Vite",
+          role: "Web 前端",
+          body: "本站点：TRIP 门户 + 身份/采集/导入/验证/证书/Explorer 控制台，浏览器内完成全部密码学操作。",
+        },
+        {
+          name: "trip-cli（gyid）",
+          lang: "Rust",
+          role: "命令行",
+          body: "二进制名 gyid：identity / collect / verify / poh / explorer 用户命令，外加 chain / cbor / key 等协议调试命令。",
+        },
+        {
+          name: "gyid-android-rs + gyid-android",
+          lang: "UniFFI + Compose",
+          role: "Android",
+          body: "Rust 经 UniFFI 生成 Kotlin 绑定；前台服务采集 FusedLocation / WiFi / IMU，300 条分批断点续传，8 步验证状态机。",
+        },
+        {
+          name: "contracts/GeoTITRegistry",
+          lang: "Solidity",
+          role: "链上锚定",
+          body: "TIT 注册合约（Foundry）：把轨迹身份锚定到链上，绑定公钥与长期链摘要，供链上应用做防女巫查询。",
+        },
+      ],
+    },
+    api: {
+      eyebrow: "VERIFIER API",
+      title: "HTTP / WebSocket 端点",
+      desc: "默认监听 :8080，TRIP_CORS_ORIGINS 环境变量配置跨域（逗号分隔，* 为通配）。",
+      endpoints: [
+        { m: "POST", path: "/v1/evidence", desc: "上传面包屑 CBOR 帧，服务端校验签名/链规则后按链合并" },
+        { m: "GET", path: "/v1/identity/:hex", desc: "查询 attester 的面包屑数、独立 cell、链头与最后时间戳" },
+        { m: "POST", path: "/v1/verify", desc: "RP 发起主动验证：提交 attester + nonce，创建挑战" },
+        { m: "GET", path: "/v1/challenge", desc: "WebSocket 挑战通道：ready 握手 → 下发 challenge → 收签名应答" },
+        { m: "POST", path: "/v1/poh", desc: "凭 challenge_id 取 PoH（200 CBOR / 202 pending / 410 过期）" },
+        { m: "GET", path: "/v1/pohs?attester=", desc: "列出某 attester 的全部 PoH challenge" },
+        { m: "GET", path: "/v1/explorer", desc: "全网身份总览：全部 attester 统计 + PoH 计数，按活跃度排序" },
+        { m: "GET", path: "/v1/did/:did", desc: "解析 TRIP DID 为公钥与身份信息" },
+        { m: "GET", path: "/v1/tit/:hex", desc: "按 attester 公钥计算/签发轨迹身份令牌 TIT" },
+        { m: "GET", path: "/.well-known/verifier.json", desc: "Verifier 元数据与公钥（客户端信任锚点）" },
+      ],
+    },
+    quickstart: {
+      eyebrow: "QUICK START",
+      title: "开发者快速开始",
+      steps: [
+        {
+          title: "1. 跑测试（workspace 全绿）",
+          code: "git clone git@github.com:huanghe2026/GYIDpro.git\ncd GYIDpro\ncargo test --workspace",
+        },
+        {
+          title: "2. 启动 Verifier",
+          code: "cargo run -p trip-server --release\n# → trip-server listening on 0.0.0.0:8080",
+        },
+        {
+          title: "3. CLI 走一遍身份与采集",
+          code: "gyid identity new --label me\ngyid collect --res 7 --interval 900     # 采集并签名面包屑\ngyid verify                              # RP 主动验证\ngyid explorer                            # 全网身份总览",
+        },
+        {
+          title: "4. Web 前端（本页面所属）",
+          code: "cd gyid-wasm && wasm-pack build --target web --release\ncd ../gyid-web && pnpm install && pnpm dev\n# VITE_VERIFIER_URL 可指向远端 Verifier",
+        },
+      ],
+      ctaPre: "想直接体验？",
+      ctaLink: "打开 Web 控制台 →",
+    },
+  },
+
+  console: {
+    brand: "TRIP 控制台",
+    locked: "未解锁",
+    lock: "锁定",
+    backPortal: "← 返回 TRIP 门户",
+  },
+
+  unlock: {
+    title: "需要解锁身份",
+    noIdentityPre: "还没有身份。先到",
+    noIdentityPage: "Identity 页",
+    noIdentityPost: "创建一个。",
+    currentPre: "当前账户：",
+    currentMid: "，输入 passphrase 解锁（seed 仅存在于内存，刷新页面需重新解锁）。",
+    btn: "解锁",
+    unlocking: "解锁中…",
+    failed: "解锁失败，请检查 passphrase",
+  },
+
+  identity: {
+    newBtn: "+ 新建身份",
+    createTitle: "新建身份",
+    labelPlaceholder: "标签（可选，如 phone / laptop）",
+    passPlaceholder: "passphrase（至少 6 位）",
+    pass2Placeholder: "再输一遍 passphrase",
+    passTooShort: "passphrase 至少 6 位",
+    passMismatch: "两次输入的 passphrase 不一致",
+    createFail: "创建失败",
+    generating: "生成中…",
+    createSubmit: "生成并加密保存",
+    unlockedTag: "● 已解锁（seed 仅在内存）",
+    pubkeyLabel: "Attester 公钥（pubkey hex）",
+    chainStatus: "Verifier 链上状态",
+    connFail: "无法连接 Verifier：{msg}（确认 trip-server 已启动）",
+    statCount: "面包屑总数",
+    statCells: "唯一 H3 cell",
+    statHead: "链头 hash",
+    statLast: "最后时间戳",
+    noEvidence: "Verifier 上还没有这个身份的证据 —— 去 Collect 页采集并上传第一组面包屑。",
+    unlockTitle: "解锁「{label}」",
+    unlocking: "解锁中…",
+    localAccounts: "本地账户（{n}）",
+    noAccounts: "暂无账户，点击右上角「+ 新建身份」开始。",
+    createdAt: "创建于 {date}",
+    unlocked: "已解锁",
+    switch: "切换",
+    deleteConfirm: "删除账户「{label}」？加密记录将从本机移除（不可恢复）。",
+    onchain: {
+      title: "区块链登记（GeoTITRegistry）",
+      loading: "查询链上登记状态…",
+      unregistered:
+        "尚未上链：完成首次主动验证后，Verifier 会自动把你的身份登记到区块链。",
+      error: "链上查询失败（RPC 不可达），稍后重试。",
+      registeredAt: "登记时间",
+      epochs: "已锚定周期",
+      cells: "最近唯一网格",
+      handle: "Handle",
+      handleNone: "未声明",
+      view: "在区块浏览器查看",
+    },
+  },
+
+  collect: {
+    exploration: "探索模式（5–15 分钟）",
+    autoCollect: "自动采集",
+    locationTitle: "定位",
+    manualMode: "手动坐标模式（桌面调试）",
+    waitingGps: "等待 GPS 定位…（需浏览器定位权限）",
+    gps: "● GPS",
+    accuracy: "精度 ±{n}m",
+    gpsUnsupported: "浏览器不支持 Geolocation API，已切换手动坐标",
+    gpsError: "GPS 不可用：{msg}（可改用手动坐标）",
+    toGps: "切回 GPS",
+    toManual: "改用手动坐标",
+    paramsTitle: "采集参数",
+    h3Resolution: "H3 分辨率（7..=10）",
+    currentCell: "当前 H3 cell（hex）",
+    intervalLine: "间隔 {n}s · 距下次可采集",
+    ready: "ready",
+    btnBusy: "处理中…",
+    collectBtn: "立即采集并签名（手动）",
+    chainTitle: "本地链",
+    miniLocal: "本地",
+    miniUploaded: "已上传",
+    miniPending: "待同步",
+    checkPre: "全链自检：",
+    checkOk: "✓ 通过",
+    checkBad: "✗ 违规（见 console）",
+    retryUpload: "续传未同步",
+    verifyChain: "全链自检",
+    clear: "清空",
+    resetConfirm: "清空本账户的本地面包屑链？（Verifier 上已上传的记录不受影响）",
+    mapTitle: "轨迹（蓝点 = 面包屑，红点 = 当前定位）",
+    logTitle: "采集日志",
+    noLogs: "暂无日志",
+    logNoCoords: "✗ 无可用坐标",
+    logSigned: "✓ #{n} 已签名 ({lat}, {lng})",
+    logUploaded: "✓ 上传 {n} 条到 Verifier",
+    logUploadFail: "✗ 上传失败：{e}（本地保留，下次自动续传）",
+    logCollectFail: "✗ 采集失败：{e}",
+    logBackfilled: "✓ 补传 {n} 条",
+    logAllSynced: "所有面包屑均已同步",
+    logBackfillFail: "✗ 补传失败：{e}",
+    logCleared: "本地链已清空",
+  },
+
+  imp: {
+    subtitle: "手动导入 GPX / 带 GPS 的照片，离线也能造面包屑链（原始经纬度不出端）",
+    fileTitle: "1. 选择轨迹文件",
+    gpxLabel: "GPX（XML，含 <trkpt>/<rtept>/<wpt>）",
+    photoLabel: "照片（JPEG，可多选；读 EXIF GPS + 拍摄时间）",
+    gpxReady: "✓ {name}：{n} 个候选点",
+    photosReady: "✓ {n} 张含 GPS",
+    paramsTitle: "2. 参数",
+    h3Resolution: "H3 分辨率（7..=10）",
+    synthInterval: "缺时间点的合成间隔（秒，≥300）",
+    exploration: "探索会话（允许 5–15 分钟间隔，§4.2）",
+    tzNote: "照片 EXIF 无时区，拍摄时间按 UTC 解释；GPX 的 <time> 建议为 UTC（ISO 8601）。导入的时间戳不会被改写。",
+    previewTitle: "3. 预演（链规则过滤）",
+    miniCandidates: "候选点",
+    miniAccepted: "将接受",
+    miniRejected: "将丢弃",
+    quantizing: "正在量化 H3 并过滤…",
+    timeRange: "轨迹时间范围：{a} → {b}",
+    reasonsTitle: "丢弃原因分布",
+    reasonSameCell: "与上一条落在同一 H3 cell（§4.1 连续去重）",
+    reasonCellCap: "该 cell 累计已达 10 条上限（防静止耕作）",
+    reasonTooSoon: "与上一条间隔不足（<300s 硬下限；未开探索会话需 ≥900s）",
+    reasonTimeBackwards: "早于本地链尾时间（请先清空本地链再导入旧轨迹）",
+    importBtn: "导入并追加到本地链（{n} 条）",
+    signing: "签名中… {progress}",
+    imported: "✓ 已新增 {n} 条面包屑",
+    logImportDone: "导入完成：新增 {a} 条，丢弃 {s} 条",
+    syncTitle: "4. 同步与自检",
+    miniLocal: "本地",
+    miniUploaded: "已上传",
+    miniPending: "待同步",
+    tailTs: "链尾时间：{t}",
+    checkPre: "全链自检：",
+    checkOk: "✓ 通过",
+    checkBad: "✗ 违规（见 console）",
+    uploadBtn: "上传到 Verifier",
+    verifyChain: "全链自检",
+    failedTitle: "无法解析的照片",
+    mapTitle: "本地链轨迹（蓝点 = 面包屑）",
+    logTitle: "导入日志",
+    noLogs: "暂无日志",
+    logGpx: "GPX {name}：{n} 点（坐标非法丢弃 {invalid}，缺时间合成 {syn}）",
+    logPhotosOk: "照片：{n}/{total} 张含 GPS",
+    logPhotosFailSuffix: "，{f} 张无法解析",
+    logUploaded: "✓ 上传 {n} 条到 Verifier",
+    logAllSynced: "所有面包屑均已同步",
+    logUploadFail: "✗ 上传失败：{e}（本地保留，可重试续传）",
+    errGpxParse: "GPX 解析失败：{e}",
+    errXml: "XML 格式错误",
+    errNoTrackPoints: "未在文件中找到 trkpt / rtept / wpt 轨迹点",
+    errNoValidLatLon: "轨迹点均缺少合法的 lat/lon",
+    errNoGps: "无 GPS EXIF（或非 JPEG）",
+  },
+
+  verify: {
+    newNonce: "换 nonce",
+    newNonceTitle: "RP 防重放 nonce（16 字节随机）",
+    start: "发起验证",
+    running: "进行中…",
+    warning:
+      "验证期间请勿在 Collect 页采集：挑战会绑定当前链头，链头变化后服务端拒绝签发。该身份需先在 Collect 页上传过面包屑，否则 POST /v1/verify 返回 404。",
+    flowTitle: "流程",
+    steps: [
+      "连接 Verifier WebSocket",
+      "请求挑战（POST /v1/verify）",
+      "接收 LivenessChallenge",
+      "签名回送 LivenessResponse",
+      "轮询取回 PoH 证书",
+      "本地 verify_poh 校验",
+    ],
+    challengeTitle: "挑战",
+    expiresLine: "过期时间：{t} ｜ 推送：{d}",
+    delivered: "已送达 WS",
+    notDelivered: "未送达",
+    livenessTitle: "LivenessChallenge 字段",
+    nonceMatch: "rp_nonce: {n}（与本地生成一致）",
+    expectedLine: "expected_index: {i} ｜ deadline: {t}",
+    pohPlaceholder: "PoH 证书将在此展示",
+    badgePass: "FRESH + PASS",
+    badgeReject: "REJECTED",
+    freshLine: "fresh: {f} ｜ policy_pass: {p}",
+    dtTrust: "信任分 trust",
+    dtConfidence: "置信度 confidence",
+    dtAbk: "α / β / κ / π",
+    dtCrumbs: "面包屑 / 唯一 cell",
+    dtIssued: "签发时间",
+    dtValidity: "有效期",
+    validityValue: "{n}s（至 {t}）",
+    dtNonce: "nonce / chain_head",
+    cborLine: "CBOR: {hex}…（点击复制）",
+    cborTitle: "点击复制完整证书 CBOR hex",
+    logTitle: "日志",
+    emptyLog: "点击「发起验证」开始",
+    logConnecting: "连接 Verifier WS…",
+    logReadyTimeout: "等待 WS ready 超时（检查 Verifier 是否运行）",
+    logReady: "WS ready：{d}",
+    logPostVerify: "POST /v1/verify（rp_nonce={n}…）",
+    logChallengeCreated: "挑战 {id}… 已创建，过期 {t}",
+    logNotDelivered: "挑战未被推送到 WS（delivered=false），请重试",
+    logWsText: "WS 文本：{d}",
+    logWaitTimeout: "等待挑战超时",
+    logGotChallenge: "收到挑战：expected_index={i}，deadline={t}",
+    logResponseSent: "已回送 LivenessResponse（CBOR 二进制帧）",
+    logWsAck: "WS 回执：{d}",
+    logPohTimeout: "轮询 PoH 超时（挑战可能未被处理）",
+    logPohFetched: "PoH 证书已取回（{n} 字节 CBOR）",
+    logPass: "✓ 校验通过：trust={t}，confidence={c}",
+    logFail: "✗ 未通过：fresh={f}，policy_pass={p}",
+  },
+
+  certificates: {
+    loadingList: "加载中…",
+    empty:
+      "该身份还没有 PoH 证书。先在 Collect 页采集并上传面包屑，再到 Verify 页发起一次 Active Verification。",
+    badgePass: "Fresh + PASS",
+    badgeFreshPolicyFail: "Fresh，策略未过",
+    badgeExpired: "已过期",
+    badgeStale: "Stale / FAIL",
+    fetchFail: "取回失败：{e}",
+    dtIssued: "签发",
+    dtValidUntil: "有效期至",
+    dtCrumbs: "面包屑 / cell",
+    dtMetrics: "trust / conf / α",
+  },
+
+  explorer: {
+    subtitle: "Verifier 上的公开身份与 PoH 浏览",
+    connFail: "无法连接 Verifier：{msg}",
+    connHint: "确认 trip-server 已启动（默认 http://localhost:8080）",
+    totalIdentities: "公开身份总数",
+    totalBreadcrumbs: "面包屑总数",
+    noIdentityTitle: "Verifier 上还没有公开身份",
+    noIdentityHint: "去 Collect 页采集并上传第一组面包屑，或用 CLI / Android 客户端接入。",
+    noPoh: "暂无 PoH",
+    pohCount: "PoH × {n}",
+    crumbs: "面包屑",
+    uniqueCells: "唯一 H3 cell",
+    chainHead: "链头",
+    lastActive: "最近活跃：{t}",
+  },
+
+  errors: {
+    identityCreate: "创建身份失败：{e}",
+    accountNotFound: "账户不存在",
+    identityUnlock: "解锁失败：passphrase 错误或加密数据损坏",
+  },
+} as const;
+
+// as const 会让所有字段变成 readonly 字面量类型；这里递归宽化为普通 string 结构，
+// 这样英文词典只需保持相同形状，无需逐字等于中文。
+type Widen<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly Widen<U>[]
+    : T extends object
+      ? { [K in keyof T]: Widen<T[K]> }
+      : T;
+
+export type Dict = Widen<typeof zh>;

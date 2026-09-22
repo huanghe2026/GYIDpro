@@ -21,6 +21,7 @@ import {
 } from "../stores/chain";
 import { loadWasm } from "../lib/wasm";
 import { uploadEvidence } from "../lib/verifier";
+import { t } from "../i18n";
 
 /** §4.1 默认采集间隔（秒）—— 15 分钟硬下限 */
 const NORMAL_INTERVAL = 900;
@@ -65,8 +66,8 @@ function CollectInner() {
   let tickTimer: number | null = null;
 
   const log = (msg: string) => {
-    const t = new Date().toLocaleTimeString();
-    setLogs((l) => [`[${t}] ${msg}`, ...l].slice(0, 50));
+    const time = new Date().toLocaleTimeString();
+    setLogs((l) => [`[${time}] ${msg}`, ...l].slice(0, 50));
   };
 
   // ----- 派生值 -----
@@ -117,7 +118,7 @@ function CollectInner() {
     if (!s) return;
     const c = currentCoords();
     if (!c) {
-      log("✗ 无可用坐标");
+      log(t("collect.logNoCoords"));
       return;
     }
     setBusy(true);
@@ -129,16 +130,22 @@ function CollectInner() {
         resolution: resolution(),
         exploration: exploration(),
       });
-      log(`✓ #${crumb.index} 已签名 (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)})`);
+      log(
+        t("collect.logSigned", {
+          n: crumb.index,
+          lat: c.lat.toFixed(5),
+          lng: c.lng.toFixed(5),
+        }),
+      );
       setChainOk(null);
       try {
         const n = await uploadPending(uploadEvidence);
-        if (n > 0) log(`✓ 上传 ${n} 条到 Verifier`);
+        if (n > 0) log(t("collect.logUploaded", { n }));
       } catch (e) {
-        log(`✗ 上传失败：${String(e)}（本地保留，下次自动续传）`);
+        log(t("collect.logUploadFail", { e: String(e) }));
       }
     } catch (e) {
-      log(`✗ 采集失败：${String(e)}`);
+      log(t("collect.logCollectFail", { e: String(e) }));
     } finally {
       setBusy(false);
     }
@@ -149,9 +156,9 @@ function CollectInner() {
     setBusy(true);
     try {
       const n = await uploadPending(uploadEvidence);
-      log(n > 0 ? `✓ 补传 ${n} 条` : "所有面包屑均已同步");
+      log(n > 0 ? t("collect.logBackfilled", { n }) : t("collect.logAllSynced"));
     } catch (e) {
-      log(`✗ 补传失败：${String(e)}`);
+      log(t("collect.logBackfillFail", { e: String(e) }));
     } finally {
       setBusy(false);
     }
@@ -171,10 +178,10 @@ function CollectInner() {
   };
 
   const doReset = () => {
-    if (confirm("清空本账户的本地面包屑链？（Verifier 上已上传的记录不受影响）")) {
+    if (confirm(t("collect.resetConfirm"))) {
       resetChain();
       setChainOk(null);
-      log("本地链已清空");
+      log(t("collect.logCleared"));
     }
   };
 
@@ -184,7 +191,7 @@ function CollectInner() {
     if (s) loadChain(s.pubkeyHex);
 
     if (!("geolocation" in navigator)) {
-      setGpsErr("浏览器不支持 Geolocation API，已切换手动坐标");
+      setGpsErr(t("collect.gpsUnsupported"));
       setManual(true);
     } else {
       watchId = navigator.geolocation.watchPosition(
@@ -196,7 +203,7 @@ function CollectInner() {
           });
           setGpsErr(null);
         },
-        (err) => setGpsErr(`GPS 不可用：${err.message}（可改用手动坐标）`),
+        (err) => setGpsErr(t("collect.gpsError", { msg: err.message })),
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
       );
     }
@@ -232,7 +239,7 @@ function CollectInner() {
               checked={exploration()}
               onChange={(e) => setExploration(e.currentTarget.checked)}
             />
-            <span>探索模式（5–15 分钟）</span>
+            <span>{t("collect.exploration")}</span>
           </label>
           <label class="flex items-center gap-1.5 cursor-pointer">
             <input
@@ -240,7 +247,7 @@ function CollectInner() {
               checked={autoCollect()}
               onChange={(e) => setAutoCollect(e.currentTarget.checked)}
             />
-            <span>自动采集</span>
+            <span>{t("collect.autoCollect")}</span>
           </label>
         </div>
       </div>
@@ -249,12 +256,12 @@ function CollectInner() {
         {/* 左：控制面板 */}
         <div class="space-y-4">
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">定位</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("collect.locationTitle")}</h2>
             <Show
               when={!manual()}
               fallback={
                 <div>
-                  <p class="text-xs text-gray-500 mb-2">手动坐标模式（桌面调试）</p>
+                  <p class="text-xs text-gray-500 mb-2">{t("collect.manualMode")}</p>
                   <div class="flex gap-2">
                     <input
                       class="w-full border rounded px-2 py-1.5 text-sm"
@@ -276,16 +283,16 @@ function CollectInner() {
                 when={gps()}
                 fallback={
                   <p class="text-sm text-gray-500">
-                    等待 GPS 定位…（需浏览器定位权限）
+                    {t("collect.waitingGps")}
                   </p>
                 }
               >
                 <p class="text-sm">
-                  <span class="text-green-700">● GPS</span>{" "}
+                  <span class="text-green-700">{t("collect.gps")}</span>{" "}
                   {gps()!.lat.toFixed(6)}, {gps()!.lng.toFixed(6)}
                 </p>
                 <p class="text-xs text-gray-500">
-                  精度 ±{Math.round(gps()!.accuracy ?? NaN)}m
+                  {t("collect.accuracy", { n: Math.round(gps()!.accuracy ?? NaN) })}
                 </p>
               </Show>
             </Show>
@@ -296,14 +303,14 @@ function CollectInner() {
               class="text-xs text-blue-600 hover:underline"
               onClick={() => setManual((v) => !v)}
             >
-              {manual() ? "切回 GPS" : "改用手动坐标"}
+              {manual() ? t("collect.toGps") : t("collect.toManual")}
             </button>
           </div>
 
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">采集参数</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("collect.paramsTitle")}</h2>
             <label class="block">
-              <span class="text-xs text-gray-500">H3 分辨率（7..=10）</span>
+              <span class="text-xs text-gray-500">{t("collect.h3Resolution")}</span>
               <select
                 class="w-full border rounded px-2 py-1.5 text-sm mt-1"
                 value={resolution()}
@@ -315,7 +322,7 @@ function CollectInner() {
               </select>
             </label>
             <div>
-              <span class="text-xs text-gray-500">当前 H3 cell（hex）</span>
+              <span class="text-xs text-gray-500">{t("collect.currentCell")}</span>
               <code class="block mt-1 bg-gray-100 rounded px-2 py-1.5 text-xs break-all">
                 <Show when={cellHex()} fallback={"—"}>
                   {cellHex()}
@@ -324,7 +331,7 @@ function CollectInner() {
             </div>
             <div class="flex items-center justify-between">
               <span class="text-xs text-gray-500">
-                间隔 {intervalSec()}s · 距下次可采集
+                {t("collect.intervalLine", { n: intervalSec() })}
               </span>
               <span
                 class="font-mono text-lg font-semibold"
@@ -333,7 +340,7 @@ function CollectInner() {
                   "text-gray-800": remainingSec() > 0,
                 }}
               >
-                {remainingSec() === 0 ? "ready" : fmtCountdown(remainingSec())}
+                {remainingSec() === 0 ? t("collect.ready") : fmtCountdown(remainingSec())}
               </span>
             </div>
             <button
@@ -341,16 +348,16 @@ function CollectInner() {
               disabled={busy() || !currentCoords()}
               onClick={doCollect}
             >
-              {busy() ? "处理中…" : "立即采集并签名（手动）"}
+              {busy() ? t("collect.btnBusy") : t("collect.collectBtn")}
             </button>
           </div>
 
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">本地链</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("collect.chainTitle")}</h2>
             <div class="grid grid-cols-3 gap-2 text-center">
-              <MiniStat label="本地" value={chainStore.crumbs.length} />
-              <MiniStat label="已上传" value={chainStore.uploadedCount} />
-              <MiniStat label="待同步" value={pendingCount()} />
+              <MiniStat label={t("collect.miniLocal")} value={chainStore.crumbs.length} />
+              <MiniStat label={t("collect.miniUploaded")} value={chainStore.uploadedCount} />
+              <MiniStat label={t("collect.miniPending")} value={pendingCount()} />
             </div>
             <Show when={chainOk() !== null}>
               <p
@@ -360,7 +367,7 @@ function CollectInner() {
                   "text-red-700": chainOk() === false,
                 }}
               >
-                全链自检：{chainOk() ? "✓ 通过" : "✗ 违规（见 console）"}
+                {t("collect.checkPre")}{chainOk() ? t("collect.checkOk") : t("collect.checkBad")}
               </p>
             </Show>
             <div class="flex gap-2">
@@ -369,20 +376,20 @@ function CollectInner() {
                 disabled={busy() || pendingCount() === 0}
                 onClick={doRetryUpload}
               >
-                续传未同步
+                {t("collect.retryUpload")}
               </button>
               <button
                 class="flex-1 text-xs border rounded py-1.5 hover:bg-gray-50 disabled:opacity-50"
                 disabled={busy() || chainStore.crumbs.length === 0}
                 onClick={doVerify}
               >
-                全链自检
+                {t("collect.verifyChain")}
               </button>
               <button
                 class="flex-1 text-xs border rounded py-1.5 text-red-600 hover:bg-red-50"
                 onClick={doReset}
               >
-                清空
+                {t("collect.clear")}
               </button>
             </div>
           </div>
@@ -392,16 +399,16 @@ function CollectInner() {
         <div class="lg:col-span-2 space-y-4">
           <div class="bg-white rounded-lg shadow p-4">
             <h2 class="font-semibold text-sm text-gray-700 mb-3">
-              轨迹（蓝点 = 面包屑，红点 = 当前定位）
+              {t("collect.mapTitle")}
             </h2>
             <MapView coords={chainStore.coords} current={currentCoords()} />
           </div>
           <div class="bg-white rounded-lg shadow p-4">
-            <h2 class="font-semibold text-sm text-gray-700 mb-2">采集日志</h2>
+            <h2 class="font-semibold text-sm text-gray-700 mb-2">{t("collect.logTitle")}</h2>
             <div class="font-mono text-xs space-y-1 max-h-48 overflow-y-auto">
               <Show
                 when={logs().length > 0}
-                fallback={<p class="text-gray-400">暂无日志</p>}
+                fallback={<p class="text-gray-400">{t("collect.noLogs")}</p>}
               >
                 <For each={logs()}>{(line) => <p>{line}</p>}</For>
               </Show>

@@ -3,7 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TRIP · GyID — 轨迹身份证明协议实现</title>
+    <title>Geoyuan ID（GyID）— 用真实轨迹证明你是真人</title>
+    <script>
+      // 早期语言检测：必须在首帧前运行，避免 <html lang> / 标题语言闪烁。
+      // 与 src/i18n/index.ts 的 detectLocale() 保持同一优先级：
+      // localStorage("gyid.locale") 手动选择 > 浏览器语言 > 中文兜底。
+      (function () {
+        var tag = "zh-CN";
+        try {
+          var saved = localStorage.getItem("gyid.locale");
+          if (saved === "en") {
+            tag = "en";
+          } else if (saved !== "zh") {
+            var langs =
+              navigator.languages && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language];
+            var isZh = langs.some(function (l) {
+              return l && l.toLowerCase().indexOf("zh") === 0;
+            });
+            if (!isZh) tag = "en";
+          }
+        } catch (e) {
+          /* localStorage 不可用时保持中文兜底 */
+        }
+        document.documentElement.lang = tag;
+        document.title =
+          tag === "en"
+            ? "Geoyuan ID (GyID) — Prove You're Human With Your Real Trajectory"
+            : "Geoyuan ID（GyID）— 用真实轨迹证明你是真人";
+      })();
+    </script>
   </head>
   <body class="bg-gray-50">
     <div id="root"></div>

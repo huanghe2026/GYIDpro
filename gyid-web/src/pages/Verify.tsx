@@ -20,6 +20,7 @@ import {
   requestChallenge,
 } from "../lib/verifier";
 import { loadWasm, type LivenessChallengeJs, type PohInfoJs } from "../lib/wasm";
+import { dict, fmtDateTime, fmtTime, t } from "../i18n";
 
 /** 策略门槛（与 trip-server Config::default 对齐：min_confidence=0.1 / min_trust=20.0） */
 const MIN_CONFIDENCE = 0.1;
@@ -43,19 +44,8 @@ const PHASE_ORDER: Phase[] = [
   "polling",
 ];
 
-const STEPS = [
-  "连接 Verifier WebSocket",
-  "请求挑战（POST /v1/verify）",
-  "接收 LivenessChallenge",
-  "签名回送 LivenessResponse",
-  "轮询取回 PoH 证书",
-  "本地 verify_poh 校验",
-];
-
 const short = (h: string) =>
   h.length > 20 ? `${h.slice(0, 10)}…${h.slice(-8)}` : h;
-
-const fmtTs = (sec: number) => new Date(sec * 1000).toLocaleTimeString();
 
 /** 生成 16 字节随机 rp_nonce hex（RP 侧防重放，draft-04 §10 §1） */
 function genNonce(): string {
@@ -115,6 +105,7 @@ export default function Verify() {
 }
 
 function VerifyInner() {
+  const d = dict;
   const [phase, setPhase] = createSignal<Phase>("idle");
   const [error, setError] = createSignal<string | null>(null);
   const [logs, setLogs] = createSignal<string[]>([]);
@@ -132,8 +123,8 @@ function VerifyInner() {
   const timers: number[] = [];
 
   const log = (msg: string) => {
-    const t = new Date().toLocaleTimeString();
-    setLogs((l) => [`[${t}] ${msg}`, ...l].slice(0, 50));
+    const time = new Date().toLocaleTimeString();
+    setLogs((l) => [`[${time}] ${msg}`, ...l].slice(0, 50));
   };
 
   const sleep = (ms: number) =>
@@ -166,24 +157,31 @@ function VerifyInner() {
     try {
       // ---- 1) 连接 WS，等 ready 文本帧（注册完成，可发起挑战）----
       setPhase("connecting");
-      log("连接 Verifier WS…");
+      log(t("verify.logConnecting"));
       chan?.ws.close();
       chan = openChan(s.pubkeyHex);
       const ready = await takeMessage(chan, 10_000);
-      if (!ready) throw new Error("等待 WS ready 超时（检查 Verifier 是否运行）");
-      log(`WS ready：${typeof ready.data === "string" ? ready.data : "(binary?)"}`);
+      if (!ready) throw new Error(t("verify.logReadyTimeout"));
+      log(
+        t("verify.logReady", {
+          d: typeof ready.data === "string" ? ready.data : "(binary?)",
+        }),
+      );
 
       // ---- 2) RP 请求挑战 ----
       setPhase("requesting");
       const rpNonce = nonce();
-      log(`POST /v1/verify（rp_nonce=${rpNonce.slice(0, 8)}…）`);
+      log(t("verify.logPostVerify", { n: rpNonce.slice(0, 8) }));
       const info = await requestChallenge(s.pubkeyHex, rpNonce);
       setMeta({ id: info.challenge_id, expiresAt: info.expires_at, delivered: info.delivered });
       log(
-        `挑战 ${info.challenge_id.slice(0, 8)}… 已创建，过期 ${fmtTs(info.expires_at)}`,
+        t("verify.logChallengeCreated", {
+          id: info.challenge_id.slice(0, 8),
+          t: fmtTime(info.expires_at),
+        }),
       );
       if (!info.delivered) {
-        throw new Error("挑战未被推送到 WS（delivered=false），请重试");
+        throw new Error(t("verify.logNotDelivered"));
       }
 
       // ---- 3) 收二进制挑战帧（忽略期间的文本帧）----
@@ -191,23 +189,26 @@ function VerifyInner() {
       const waitMs = Math.max((info.expires_at * 1000 - Date.now()) | 0, 10_000) + 5_000;
       let frame = await takeMessage(chan, waitMs);
       while (frame && typeof frame.data === "string") {
-        log(`WS 文本：${frame.data}`);
+        log(t("verify.logWsText", { d: frame.data }));
         frame = await takeMessage(chan, waitMs);
       }
-      if (!frame) throw new Error("等待挑战超时");
+      if (!frame) throw new Error(t("verify.logWaitTimeout"));
       const challengeHex = bytesToHex(new Uint8Array(frame.data as ArrayBuffer));
       const wasm = await loadWasm();
       const ch = wasm.parse_liveness_challenge(challengeHex);
       setChallenge(ch);
       log(
-        `收到挑战：expected_index=${ch.expected_index}，deadline=${fmtTs(ch.deadline)}`,
+        t("verify.logGotChallenge", {
+          i: ch.expected_index,
+          t: fmtTime(ch.deadline),
+        }),
       );
 
       // ---- 4) Attester 签名回送 ----
       setPhase("responding");
       const respHex = wasm.sign_liveness_response(s.seedHex, challengeHex);
       chan.ws.send(hexToBytes(respHex));
-      log("已回送 LivenessResponse（CBOR 二进制帧）");
+      log(t("verify.logResponseSent"));
 
       // ---- 5) 轮询 PoH（202=Pending，1s 间隔）----
       setPhase("polling");
@@ -216,7 +217,9 @@ function VerifyInner() {
       while (Date.now() < pollDeadline) {
         // 顺带消费 WS 文本回执（poh_issued / error），仅入日志
         const ack = await takeMessage(chan, 0);
-        if (ack && typeof ack.data === "string") log(`WS 回执：${ack.data}`);
+        if (ack && typeof ack.data === "string") {
+          log(t("verify.logWsAck", { d: ack.data }));
+        }
         const r = await fetchPoh(info.challenge_id);
         if (r instanceof Uint8Array) {
           pohBytes = r;
@@ -224,10 +227,10 @@ function VerifyInner() {
         }
         await sleep(1000);
       }
-      if (!pohBytes) throw new Error("轮询 PoH 超时（挑战可能未被处理）");
+      if (!pohBytes) throw new Error(t("verify.logPohTimeout"));
       const hex = bytesToHex(pohBytes);
       setPohHex(hex);
-      log(`PoH 证书已取回（${pohBytes.length} 字节 CBOR）`);
+      log(t("verify.logPohFetched", { n: pohBytes.length }));
 
       // ---- 6) RP 本地校验：Verifier 签名 + 新鲜性（nonce 绑定）+ 策略 ----
       const vk = await fetchVerifierPubkeyHex();
@@ -243,8 +246,11 @@ function VerifyInner() {
       setPhase("done");
       log(
         p.is_trusted
-          ? `✓ 校验通过：trust=${p.trust.toFixed(3)}，confidence=${p.criticality_confidence.toFixed(3)}`
-          : `✗ 未通过：fresh=${p.fresh}，policy_pass=${p.policy_pass}`,
+          ? t("verify.logPass", {
+              t: p.trust.toFixed(3),
+              c: p.criticality_confidence.toFixed(3),
+            })
+          : t("verify.logFail", { f: String(p.fresh), p: String(p.policy_pass) }),
       );
     } catch (e) {
       setPhase("error");
@@ -279,32 +285,33 @@ function VerifyInner() {
             class="text-xs border rounded px-2 py-1 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
             disabled={running()}
             onClick={() => setNonce(genNonce())}
-            title="RP 防重放 nonce（16 字节随机）"
+            title={t("verify.newNonceTitle")}
           >
-            换 nonce
+            {t("verify.newNonce")}
           </button>
           <button
             class="bg-blue-600 text-white text-sm font-medium rounded px-4 py-1.5 hover:bg-blue-700 disabled:opacity-50"
             disabled={running()}
             onClick={() => void run()}
           >
-            {running() ? "进行中…" : "发起验证"}
+            {running() ? t("verify.running") : t("verify.start")}
           </button>
         </div>
       </div>
 
       <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-        验证期间请勿在 Collect 页采集：挑战会绑定当前链头，链头变化后服务端拒绝签发。
-        该身份需先在 Collect 页上传过面包屑，否则 POST /v1/verify 返回 404。
+        {t("verify.warning")}
       </p>
 
       <div class="grid gap-6 lg:grid-cols-2">
         {/* 左：步骤 + 挑战详情 */}
         <div class="space-y-4">
           <div class="bg-white rounded-lg shadow p-4">
-            <h2 class="font-semibold text-sm text-gray-700 mb-3">流程</h2>
+            <h2 class="font-semibold text-sm text-gray-700 mb-3">
+              {t("verify.flowTitle")}
+            </h2>
             <ol class="space-y-2">
-              <For each={STEPS}>
+              <For each={d().verify.steps}>
                 {(label, i) => (
                   <li class="flex items-center gap-2 text-sm">
                     <span class={`w-2 h-2 rounded-full ${stepDot(stepState(i()))}`} />
@@ -322,12 +329,17 @@ function VerifyInner() {
 
           <Show when={meta()}>
             <div class="bg-white rounded-lg shadow p-4 space-y-1 text-sm">
-              <h2 class="font-semibold text-sm text-gray-700 mb-2">挑战</h2>
+              <h2 class="font-semibold text-sm text-gray-700 mb-2">
+                {t("verify.challengeTitle")}
+              </h2>
               <p class="font-mono text-xs text-gray-600">
                 challenge_id: {meta()!.id}
               </p>
               <p class="text-gray-600">
-                过期时间：{fmtTs(meta()!.expiresAt)} ｜ 推送：{meta()!.delivered ? "已送达 WS" : "未送达"}
+                {t("verify.expiresLine", {
+                  t: fmtTime(meta()!.expiresAt),
+                  d: meta()!.delivered ? t("verify.delivered") : t("verify.notDelivered"),
+                })}
               </p>
             </div>
           </Show>
@@ -335,16 +347,19 @@ function VerifyInner() {
           <Show when={challenge()}>
             <div class="bg-white rounded-lg shadow p-4 space-y-1 text-sm">
               <h2 class="font-semibold text-sm text-gray-700 mb-2">
-                LivenessChallenge 字段
+                {t("verify.livenessTitle")}
               </h2>
               <p class="font-mono text-xs text-gray-600">
-                rp_nonce: {short(challenge()!.rp_nonce_hex)}（与本地生成一致）
+                {t("verify.nonceMatch", { n: short(challenge()!.rp_nonce_hex) })}
               </p>
               <p class="font-mono text-xs text-gray-600 break-all">
                 chain_head: {short(challenge()!.chain_head_hex)}
               </p>
               <p class="text-gray-600">
-                expected_index: {challenge()!.expected_index} ｜ deadline: {fmtTs(challenge()!.deadline)}
+                {t("verify.expectedLine", {
+                  i: challenge()!.expected_index,
+                  t: fmtTime(challenge()!.deadline),
+                })}
               </p>
             </div>
           </Show>
@@ -356,7 +371,7 @@ function VerifyInner() {
             when={p()}
             fallback={
               <div class="bg-white rounded-lg shadow p-4 text-sm text-gray-400">
-                PoH 证书将在此展示
+                {t("verify.pohPlaceholder")}
               </div>
             }
           >
@@ -369,30 +384,38 @@ function VerifyInner() {
                       : "bg-red-100 text-red-800"
                   }`}
                 >
-                  {p()!.is_trusted ? "FRESH + PASS" : "REJECTED"}
+                  {p()!.is_trusted ? t("verify.badgePass") : t("verify.badgeReject")}
                 </span>
                 <span class="text-xs text-gray-500">
-                  fresh: {String(p()!.fresh)} ｜ policy_pass: {String(p()!.policy_pass)}
+                  {t("verify.freshLine", {
+                    f: String(p()!.fresh),
+                    p: String(p()!.policy_pass),
+                  })}
                 </span>
               </div>
               <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <dt class="text-gray-500">信任分 trust</dt>
+                <dt class="text-gray-500">{t("verify.dtTrust")}</dt>
                 <dd class="font-mono text-right">{p()!.trust.toFixed(4)}</dd>
-                <dt class="text-gray-500">置信度 confidence</dt>
+                <dt class="text-gray-500">{t("verify.dtConfidence")}</dt>
                 <dd class="font-mono text-right">{p()!.criticality_confidence.toFixed(4)}</dd>
-                <dt class="text-gray-500">α / β / κ / π</dt>
+                <dt class="text-gray-500">{t("verify.dtAbk")}</dt>
                 <dd class="font-mono text-right">
                   {p()!.alpha.toFixed(3)} / {p()!.beta.toFixed(3)} / {p()!.kappa.toFixed(1)} / {p()!.pi.toFixed(1)}
                 </dd>
-                <dt class="text-gray-500">面包屑 / 唯一 cell</dt>
+                <dt class="text-gray-500">{t("verify.dtCrumbs")}</dt>
                 <dd class="font-mono text-right">
                   {p()!.breadcrumb_count} / {p()!.unique_cells}
                 </dd>
-                <dt class="text-gray-500">签发时间</dt>
-                <dd class="text-right">{new Date(p()!.issued_at * 1000).toLocaleString()}</dd>
-                <dt class="text-gray-500">有效期</dt>
-                <dd class="text-right">{p()!.validity_secs}s（至 {new Date((p()!.issued_at + p()!.validity_secs) * 1000).toLocaleTimeString()}）</dd>
-                <dt class="text-gray-500">nonce / chain_head</dt>
+                <dt class="text-gray-500">{t("verify.dtIssued")}</dt>
+                <dd class="text-right">{fmtDateTime(p()!.issued_at * 1000)}</dd>
+                <dt class="text-gray-500">{t("verify.dtValidity")}</dt>
+                <dd class="text-right">
+                  {t("verify.validityValue", {
+                    n: p()!.validity_secs,
+                    t: fmtTime(p()!.issued_at + p()!.validity_secs),
+                  })}
+                </dd>
+                <dt class="text-gray-500">{t("verify.dtNonce")}</dt>
                 <dd class="font-mono text-xs text-right break-all">
                   {short(p()!.nonce_hex)} / {short(p()!.chain_head_hex)}
                 </dd>
@@ -400,23 +423,25 @@ function VerifyInner() {
               <Show when={pohHex()}>
                 <p
                   class="mt-3 font-mono text-[10px] text-gray-400 break-all cursor-pointer hover:text-gray-600"
-                  title="点击复制完整证书 CBOR hex"
+                  title={t("verify.cborTitle")}
                   onClick={() => void navigator.clipboard.writeText(pohHex()!)}
                 >
-                  CBOR: {pohHex()!.slice(0, 64)}…（点击复制）
+                  {t("verify.cborLine", { hex: pohHex()!.slice(0, 64) })}
                 </p>
               </Show>
             </div>
           </Show>
 
           <div class="bg-white rounded-lg shadow p-4">
-            <h2 class="font-semibold text-sm text-gray-700 mb-2">日志</h2>
+            <h2 class="font-semibold text-sm text-gray-700 mb-2">
+              {t("verify.logTitle")}
+            </h2>
             <div class="font-mono text-xs text-gray-600 space-y-0.5 max-h-72 overflow-y-auto">
               <For each={logs()}>
                 {(line) => <p class="whitespace-pre-wrap break-all">{line}</p>}
               </For>
               <Show when={logs().length === 0}>
-                <p class="text-gray-400">点击「发起验证」开始</p>
+                <p class="text-gray-400">{t("verify.emptyLog")}</p>
               </Show>
             </div>
           </div>

@@ -3,7 +3,9 @@
 import type { ParentProps } from "solid-js";
 import { Show } from "solid-js";
 import { A } from "@solidjs/router";
+import LangSwitch from "./LangSwitch";
 import { identityStore, lock } from "../stores/identity";
+import { t } from "../i18n";
 
 const short = (h: string) => `${h.slice(0, 8)}…${h.slice(-6)}`;
 
@@ -26,7 +28,7 @@ export default function ConsoleLayout(props: ParentProps) {
         <A href="/" class="font-bold text-gray-900 mr-1">
           GyID
         </A>
-        <span class="text-xs text-gray-400 hidden sm:inline">TRIP 控制台</span>
+        <span class="text-xs text-gray-400 hidden sm:inline">{t("console.brand")}</span>
         <span class="text-gray-200">|</span>
         <NavLink href="/console" label="Identity" />
         <NavLink href="/console/collect" label="Collect" />
@@ -35,9 +37,10 @@ export default function ConsoleLayout(props: ParentProps) {
         <NavLink href="/console/certificates" label="Certificates" />
         <NavLink href="/console/explorer" label="Explorer" />
         <div class="ml-auto flex items-center gap-2 text-xs">
+          <LangSwitch variant="light" />
           <Show
             when={identityStore.session}
-            fallback={<span class="text-gray-400">未解锁</span>}
+            fallback={<span class="text-gray-400">{t("console.locked")}</span>}
           >
             <span class="text-green-700">●</span>
             <code class="text-gray-600">
@@ -47,7 +50,7 @@ export default function ConsoleLayout(props: ParentProps) {
               class="border rounded px-2 py-0.5 text-gray-600 hover:bg-gray-50"
               onClick={lock}
             >
-              锁定
+              {t("console.lock")}
             </button>
           </Show>
         </div>
@@ -55,7 +58,7 @@ export default function ConsoleLayout(props: ParentProps) {
       <main class="flex-1 max-w-5xl mx-auto p-6 w-full">{props.children}</main>
       <footer class="border-t bg-white py-3 text-center text-xs text-gray-400">
         <A href="/" class="hover:text-gray-600">
-          ← 返回 TRIP 门户
+          {t("console.backPortal")}
         </A>
       </footer>
     </div>

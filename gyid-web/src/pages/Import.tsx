@@ -34,16 +34,21 @@ import {
   type TrackPoint,
 } from "../lib/importers";
 import { uploadEvidence } from "../lib/verifier";
+import { fmtDateTime, t } from "../i18n";
 
-/** 丢弃原因 → 用户可读说明。 */
-const REASON_LABEL: Record<ImportSkipReason, string> = {
-  "same-cell": "与上一条落在同一 H3 cell（§4.1 连续去重）",
-  "cell-cap": "该 cell 累计已达 10 条上限（防静止耕作）",
-  "too-soon": "与上一条间隔不足（<300s 硬下限；未开探索会话需 ≥900s）",
-  "time-backwards": "早于本地链尾时间（请先清空本地链再导入旧轨迹）",
-};
-
-const fmtTs = (sec: number) => new Date(sec * 1000).toLocaleString();
+/** 丢弃原因 → 当前语言的可读说明。 */
+function reasonLabel(reason: ImportSkipReason): string {
+  switch (reason) {
+    case "same-cell":
+      return t("imp.reasonSameCell");
+    case "cell-cap":
+      return t("imp.reasonCellCap");
+    case "too-soon":
+      return t("imp.reasonTooSoon");
+    case "time-backwards":
+      return t("imp.reasonTimeBackwards");
+  }
+}
 
 export default function Import() {
   return (
@@ -74,8 +79,8 @@ function ImportInner() {
   const [chainOk, setChainOk] = createSignal<boolean | null>(null);
 
   const log = (msg: string) => {
-    const t = new Date().toLocaleTimeString();
-    setLogs((l) => [`[${t}] ${msg}`, ...l].slice(0, 60));
+    const time = new Date().toLocaleTimeString();
+    setLogs((l) => [`[${time}] ${msg}`, ...l].slice(0, 60));
   };
 
   /** 合并 GPX + 照片候选点（按时间升序）。 */
@@ -146,8 +151,12 @@ function ImportInner() {
       });
       setGpx({ name: file.name, result });
       log(
-        `GPX ${file.name}：${result.points.length} 点` +
-          `（坐标非法丢弃 ${result.invalid}，缺时间合成 ${result.synthesized}）`,
+        t("imp.logGpx", {
+          name: file.name,
+          n: result.points.length,
+          invalid: result.invalid,
+          syn: result.synthesized,
+        }),
       );
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : String(e2));
@@ -170,8 +179,10 @@ function ImportInner() {
       const result = await parsePhotoFiles(files);
       setPhotos({ names: files.map((f) => f.name), result });
       log(
-        `照片：${result.points.length}/${files.length} 张含 GPS` +
-          (result.failed.length > 0 ? `，${result.failed.length} 张无法解析` : ""),
+        t("imp.logPhotosOk", { n: result.points.length, total: files.length }) +
+          (result.failed.length > 0
+            ? t("imp.logPhotosFailSuffix", { f: result.failed.length })
+            : ""),
       );
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : String(e2));
@@ -198,7 +209,7 @@ function ImportInner() {
       });
       setImportResult(res);
       setChainOk(null);
-      log(`导入完成：新增 ${res.added} 条，丢弃 ${res.skipped.length} 条`);
+      log(t("imp.logImportDone", { a: res.added, s: res.skipped.length }));
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : String(e2));
     } finally {
@@ -212,9 +223,9 @@ function ImportInner() {
     setBusy(true);
     try {
       const n = await uploadPending(uploadEvidence);
-      log(n > 0 ? `✓ 上传 ${n} 条到 Verifier` : "所有面包屑均已同步");
+      log(n > 0 ? t("imp.logUploaded", { n }) : t("imp.logAllSynced"));
     } catch (e2) {
-      log(`✗ 上传失败：${String(e2)}（本地保留，可重试续传）`);
+      log(t("imp.logUploadFail", { e: String(e2) }));
     } finally {
       setBusy(false);
     }
@@ -238,7 +249,7 @@ function ImportInner() {
       <div>
         <h1 class="text-2xl font-bold">Import</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          手动导入 GPX / 带 GPS 的照片，离线也能造面包屑链（原始经纬度不出端）
+          {t("imp.subtitle")}
         </p>
       </div>
 
@@ -252,9 +263,9 @@ function ImportInner() {
         {/* 左：来源与参数 */}
         <div class="space-y-4">
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">1. 选择轨迹文件</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("imp.fileTitle")}</h2>
             <label class="block">
-              <span class="text-xs text-gray-500">GPX（XML，含 &lt;trkpt&gt;/&lt;rtept&gt;/&lt;wpt&gt;）</span>
+              <span class="text-xs text-gray-500">{t("imp.gpxLabel")}</span>
               <input
                 type="file"
                 accept=".gpx,application/gpx+xml,application/xml,text/xml"
@@ -264,12 +275,12 @@ function ImportInner() {
             </label>
             <Show when={gpx()}>
               <p class="text-xs text-green-700">
-                ✓ {gpx()!.name}：{gpx()!.result.points.length} 个候选点
+                {t("imp.gpxReady", { name: gpx()!.name, n: gpx()!.result.points.length })}
               </p>
             </Show>
             <label class="block border-t pt-3">
               <span class="text-xs text-gray-500">
-                照片（JPEG，可多选；读 EXIF GPS + 拍摄时间）
+                {t("imp.photoLabel")}
               </span>
               <input
                 type="file"
@@ -281,15 +292,15 @@ function ImportInner() {
             </label>
             <Show when={photos()}>
               <p class="text-xs text-green-700">
-                ✓ {photos()!.result.points.length} 张含 GPS
+                {t("imp.photosReady", { n: photos()!.result.points.length })}
               </p>
             </Show>
           </div>
 
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">2. 参数</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("imp.paramsTitle")}</h2>
             <label class="block">
-              <span class="text-xs text-gray-500">H3 分辨率（7..=10）</span>
+              <span class="text-xs text-gray-500">{t("imp.h3Resolution")}</span>
               <select
                 class="w-full border rounded px-2 py-1.5 text-sm mt-1"
                 value={resolution()}
@@ -302,7 +313,7 @@ function ImportInner() {
             </label>
             <label class="block">
               <span class="text-xs text-gray-500">
-                缺时间点的合成间隔（秒，≥300）
+                {t("imp.synthInterval")}
               </span>
               <input
                 type="number"
@@ -321,11 +332,10 @@ function ImportInner() {
                 checked={exploration()}
                 onChange={(e) => setExploration(e.currentTarget.checked)}
               />
-              <span>探索会话（允许 5–15 分钟间隔，§4.2）</span>
+              <span>{t("imp.exploration")}</span>
             </label>
             <p class="text-[11px] text-gray-400 leading-relaxed">
-              照片 EXIF 无时区，拍摄时间按 UTC 解释；GPX 的 &lt;time&gt; 建议为
-              UTC（ISO 8601）。导入的时间戳不会被改写。
+              {t("imp.tzNote")}
             </p>
           </div>
         </div>
@@ -333,37 +343,40 @@ function ImportInner() {
         {/* 中：预演与操作 */}
         <div class="space-y-4">
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">3. 预演（链规则过滤）</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("imp.previewTitle")}</h2>
             <div class="grid grid-cols-3 gap-2 text-center">
-              <MiniStat label="候选点" value={candidates().length} />
+              <MiniStat label={t("imp.miniCandidates")} value={candidates().length} />
               <MiniStat
-                label="将接受"
+                label={t("imp.miniAccepted")}
                 value={preview()?.accepted ?? 0}
                 tone="green"
               />
               <MiniStat
-                label="将丢弃"
+                label={t("imp.miniRejected")}
                 value={preview()?.skipped.length ?? 0}
                 tone="red"
               />
             </div>
             <Show when={preview.loading}>
-              <p class="text-xs text-gray-500">正在量化 H3 并过滤…</p>
+              <p class="text-xs text-gray-500">{t("imp.quantizing")}</p>
             </Show>
             <Show when={timeRange()}>
               {(r) => (
                 <p class="text-[11px] text-gray-500">
-                  轨迹时间范围：{fmtTs(r()[0])} → {fmtTs(r()[1])}
+                  {t("imp.timeRange", {
+                    a: fmtDateTime(r()[0] * 1000),
+                    b: fmtDateTime(r()[1] * 1000),
+                  })}
                 </p>
               )}
             </Show>
             <Show when={(preview()?.skipped.length ?? 0) > 0}>
               <div class="border rounded p-2 space-y-1">
-                <p class="text-xs font-medium text-gray-700">丢弃原因分布</p>
+                <p class="text-xs font-medium text-gray-700">{t("imp.reasonsTitle")}</p>
                 <For each={Array.from(skipCounts().entries())}>
                   {([reason, count]) => (
                     <p class="text-[11px] text-gray-600">
-                      {count} × {REASON_LABEL[reason]}
+                      {count} × {reasonLabel(reason)}
                     </p>
                   )}
                 </For>
@@ -375,26 +388,26 @@ function ImportInner() {
               onClick={doImport}
             >
               {progress()
-                ? `签名中… ${progress()}`
-                : `导入并追加到本地链（${preview()?.accepted ?? 0} 条）`}
+                ? t("imp.signing", { progress: progress()! })
+                : t("imp.importBtn", { n: preview()?.accepted ?? 0 })}
             </button>
             <Show when={importResult()}>
               <p class="text-xs text-green-700">
-                ✓ 已新增 {importResult()!.added} 条面包屑
+                {t("imp.imported", { n: importResult()!.added })}
               </p>
             </Show>
           </div>
 
           <div class="bg-white rounded-lg shadow p-4 space-y-3">
-            <h2 class="font-semibold text-sm text-gray-700">4. 同步与自检</h2>
+            <h2 class="font-semibold text-sm text-gray-700">{t("imp.syncTitle")}</h2>
             <div class="grid grid-cols-3 gap-2 text-center">
-              <MiniStat label="本地" value={chainStore.crumbs.length} />
-              <MiniStat label="已上传" value={chainStore.uploadedCount} />
-              <MiniStat label="待同步" value={pending()} />
+              <MiniStat label={t("imp.miniLocal")} value={chainStore.crumbs.length} />
+              <MiniStat label={t("imp.miniUploaded")} value={chainStore.uploadedCount} />
+              <MiniStat label={t("imp.miniPending")} value={pending()} />
             </div>
             <Show when={tailTs() !== null}>
               <p class="text-[11px] text-gray-500">
-                链尾时间：{fmtTs(tailTs()!)}
+                {t("imp.tailTs", { t: fmtDateTime(tailTs()! * 1000) })}
               </p>
             </Show>
             <Show when={chainOk() !== null}>
@@ -405,7 +418,7 @@ function ImportInner() {
                   "text-red-700": chainOk() === false,
                 }}
               >
-                全链自检：{chainOk() ? "✓ 通过" : "✗ 违规（见 console）"}
+                {t("imp.checkPre")}{chainOk() ? t("imp.checkOk") : t("imp.checkBad")}
               </p>
             </Show>
             <div class="flex gap-2">
@@ -414,21 +427,21 @@ function ImportInner() {
                 disabled={busy() || pending() === 0}
                 onClick={doUpload}
               >
-                上传到 Verifier
+                {t("imp.uploadBtn")}
               </button>
               <button
                 class="flex-1 text-xs border rounded py-1.5 hover:bg-gray-50 disabled:opacity-50"
                 disabled={busy() || chainStore.crumbs.length === 0}
                 onClick={doVerify}
               >
-                全链自检
+                {t("imp.verifyChain")}
               </button>
             </div>
           </div>
 
           <Show when={photos() && photos()!.result.failed.length > 0}>
             <div class="bg-white rounded-lg shadow p-4 space-y-1">
-              <h2 class="font-semibold text-sm text-gray-700">无法解析的照片</h2>
+              <h2 class="font-semibold text-sm text-gray-700">{t("imp.failedTitle")}</h2>
               <For each={photos()!.result.failed.slice(0, 10)}>
                 {(f) => (
                   <p class="text-[11px] text-gray-600">
@@ -444,16 +457,16 @@ function ImportInner() {
         <div class="space-y-4">
           <div class="bg-white rounded-lg shadow p-4">
             <h2 class="font-semibold text-sm text-gray-700 mb-3">
-              本地链轨迹（蓝点 = 面包屑）
+              {t("imp.mapTitle")}
             </h2>
             <MapView coords={chainStore.coords} current={null} />
           </div>
           <div class="bg-white rounded-lg shadow p-4">
-            <h2 class="font-semibold text-sm text-gray-700 mb-2">导入日志</h2>
+            <h2 class="font-semibold text-sm text-gray-700 mb-2">{t("imp.logTitle")}</h2>
             <div class="font-mono text-xs space-y-1 max-h-48 overflow-y-auto">
               <Show
                 when={logs().length > 0}
-                fallback={<p class="text-gray-400">暂无日志</p>}
+                fallback={<p class="text-gray-400">{t("imp.noLogs")}</p>}
               >
                 <For each={logs()}>{(line) => <p>{line}</p>}</For>
               </Show>
