@@ -1,59 +1,218 @@
 //! 标定报告生成器（W7 数据白皮书草稿）。
 //!
-//! 本模块将 `calibration` 模块的 JSON 输出转换为 Markdown 格式的
-//! 数据白皮书草稿，用于贡献给 IETF TRIP 草案上游。
+//! 把 `calibration` 模块产出的 JSON 报告（`gyid calibrate synth` /
+//! `gyid calibrate geolife`）渲染成 Markdown 白皮书草稿，用于贡献给 IETF
+//! TRIP 草案上游（草案 §7.4 点名"单轨迹集成统计量的 ROC/置信区间未经验证，
+//! 需 GeoLife/MDC 做 companion publication"）。
+//!
+//! 渲染是**数据集无关**的：标题、来源、输入单位与计数优先读 `dataset` 块，
+//! 缺失时回退到 `population_report.dataset` / `summary.*`，因此同一份生成器
+//! 既可渲染真实 GeoLife 报告，也可渲染离线合成标定报告。
 
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
+use crate::engine::psd::{ALPHA_CENTER, BIO_ALPHA_MAX, BIO_ALPHA_MIN};
+
+/// 数据集描述（从 JSON 推断，缺失字段有安全回退）。
+struct DatasetInfo {
+    name: String,
+    source: String,
+    input_unit: String,
+    input_count: u64,
+    synthetic: bool,
+}
+
+/// 从标定 JSON 中提取数据集描述。
+fn dataset_info(json: &Value) -> DatasetInfo {
+    let ds = json.get("dataset");
+    let pop = json.get("population_report");
+
+    let synthetic = json
+        .get("calibration_type")
+        .and_then(Value::as_str)
+        .is_some_and(|t| t.contains("synthetic"));
+
+    let name = ds
+        .and_then(|d| d.get("name"))
+        .and_then(Value::as_str)
+        .or_else(|| pop.and_then(|p| p.get("dataset")).and_then(Value::as_str))
+        .unwrap_or("TRIP Calibration")
+        .to_string();
+
+    let source = ds
+        .and_then(|d| d.get("source"))
+        .and_then(Value::as_str)
+        .unwrap_or("—")
+        .to_string();
+
+    let input_unit = ds
+        .and_then(|d| d.get("input_unit"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            if synthetic {
+                "synthetic trajectories".to_string()
+            } else {
+                "PLT files".to_string()
+            }
+        });
+
+    let input_count = ds
+        .and_then(|d| d.get("input_count"))
+        .and_then(Value::as_u64)
+        .or_else(|| {
+            json.get("summary")
+                .and_then(|s| s.get("total_plt_files"))
+                .and_then(Value::as_u64)
+        })
+        .or_else(|| {
+            pop.and_then(|p| p.get("total_trajectories"))
+                .and_then(Value::as_u64)
+        })
+        .unwrap_or(0);
+
+    DatasetInfo {
+        name,
+        source,
+        input_unit,
+        input_count,
+        synthetic,
+    }
+}
+
+/// 数值格式化（缺失 → `—`）。
+fn f(value: &Value, key: &str) -> String {
+    value
+        .get(key)
+        .and_then(Value::as_f64)
+        .map(|v| format!("{v:.4}"))
+        .unwrap_or_else(|| "—".to_string())
+}
+
+/// 无小数的数值格式化。
+fn u(value: &Value, key: &str) -> String {
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "—".to_string())
+}
+
 /// 生成数据白皮书 Markdown。
 pub fn generate_whitepaper(calibration_json: &Value, output_path: &Path) -> std::io::Result<()> {
+    let info = dataset_info(calibration_json);
     let summary = &calibration_json["summary"];
     let pop = &calibration_json["population_report"];
     let alpha = &pop["alpha_stats"];
 
     let mut md = String::new();
 
-    // 标题
-    md.push_str("# GeoLife (Beijing) Population Calibration Report\n\n");
-    md.push_str("*TRIP Protocol Draft-04 §7.1 α Boundary Calibration*\n\n");
+    // ── 标题 ────────────────────────────────────────────────────────────
+    md.push_str(&format!(
+        "# {} — Population Calibration Report\n\n",
+        info.name
+    ));
+    md.push_str("*TRIP Protocol draft-ayerbe-trip-protocol-04 §7.1 α Boundary Calibration*\n\n");
     md.push_str(&format!(
         "**Generated**: {}\n\n",
-        pop["metadata"]["analyzed_at"]
+        pop["metadata"]["analyzed_at"].as_str().unwrap_or("—")
     ));
     md.push_str(&format!(
         "**Protocol**: {}\n\n",
-        pop["metadata"]["protocol_version"]
+        pop["metadata"]["protocol_version"].as_str().unwrap_or("—")
+    ));
+    md.push_str(&format!(
+        "**Engine**: {} (same implementation as the online Verifier)\n\n",
+        calibration_json
+            .get("engine")
+            .and_then(Value::as_str)
+            .unwrap_or("trip-core engine::calibration")
     ));
 
-    // 1. 执行摘要
+    // ── 0. 范围与来源 ───────────────────────────────────────────────────
+    md.push_str("## 0. Scope & Provenance\n\n");
+    md.push_str(
+        "Produced by the TRIP reference implementation (`trip-core`), using the **same** \
+         criticality engine that the online Verifier runs — so the numbers here are \
+         directly transferable to server-side decisions.\n\n",
+    );
+    if info.synthetic {
+        md.push_str(
+            "- **Positives (human)**: `trip_walk` structured-Levy generator (`engine::sim`).\n\
+             - **Negatives (attack)**: three synthetic families (`iid_levy`, `replay_drift`, \
+             `correlated_gaussian`).\n\n\
+             > ⚠️ These results characterize **generator-vs-generator separability**, i.e. a \
+             reproducibility baseline — *not* real-world performance. Re-run with real data \
+             (`gyid calibrate geolife`) before citing AUC as a real-world claim.\n\n",
+        );
+    } else {
+        md.push_str(&format!(
+            "- **Positives (human)**: real human trajectories — {}.\n\
+             - **Negatives (attack)**: three synthetic families generated by `engine::sim`.\n\n\
+             > AUC here is bounded by the realism of the synthetic attackers used as negatives; \
+             it is a lower bound on difficulty, not a guarantee against adaptive adversaries \
+             (see GYIP-0003 §4.1 on the adversarial learning loop).\n\n",
+            info.source
+        ));
+    }
+
+    // ── 1. 执行摘要 ─────────────────────────────────────────────────────
     md.push_str("## 1. Executive Summary\n\n");
-    let total = summary["total_plt_files"].as_u64().unwrap_or(0);
-    let analyzed = summary["analyzed_trajectories"].as_u64().unwrap_or(0);
+    let analyzed = u(summary, "analyzed_trajectories");
     md.push_str(&format!(
-        "This report presents PSD scaling exponent (α) calibration results \
-         from **{} trajectories** (analyzed from {} raw PLT files) \
-         in the Microsoft Research GeoLife dataset (Beijing, China).\n\n",
-        analyzed, total
+        "This report presents PSD scaling exponent (α) calibration results from \
+         **{analyzed} analyzed trajectories** (input: {} {}).\n\n",
+        info.input_count, info.input_unit
     ));
 
     let bio_frac = pop["bio_fraction"].as_f64().unwrap_or(0.0);
     md.push_str(&format!(
-        "**Key Finding**: {:.1}% of Chinese urban population samples fall within \
-         the draft-specified biological range α ∈ [{:.2}, {:.2}].\n\n",
+        "**Key finding**: {:.1}% of samples fall within the draft-specified \
+         biological range α ∈ [{:.2}, {:.2}].\n\n",
         bio_frac * 100.0,
-        crate::engine::psd::BIO_ALPHA_MIN,
-        crate::engine::psd::BIO_ALPHA_MAX
+        BIO_ALPHA_MIN,
+        BIO_ALPHA_MAX
     ));
 
-    // 2. 数据集描述
+    if let Some(roc) = pop.get("roc").filter(|r| !r.is_null()) {
+        let auc = roc["auc"].as_f64().unwrap_or(f64::NAN);
+        md.push_str(&format!(
+            "**Discriminative power**: AUC = **{auc:.4}** against {} synthetic \
+             attack trajectories ({} families).\n\n",
+            u(roc, "negatives"),
+            calibration_json
+                .get("control_families")
+                .and_then(Value::as_object)
+                .map(|m| m.len())
+                .unwrap_or(0)
+        ));
+    } else {
+        md.push_str(
+            "**Discriminative power**: *not computed* — no control group supplied. \
+             Run with `--control N` to obtain a real ROC/AUC.\n\n",
+        );
+    }
+
+    // ── 2. 数据集描述 ───────────────────────────────────────────────────
     md.push_str("## 2. Dataset Description\n\n");
-    md.push_str("| Property | Value |\n");
-    md.push_str("|----------|-------|\n");
-    md.push_str("| Source | Microsoft Research GeoLife (Beijing) |\n");
-    md.push_str(&format!("| Raw PLT files | {} |\n", total));
-    md.push_str(&format!("| Analyzed trajectories | {} |\n", analyzed));
+    md.push_str("| Property | Value |\n|----------|-------|\n");
+    md.push_str(&format!("| Dataset | {} |\n", info.name));
+    md.push_str(&format!("| Source | {} |\n", info.source));
+    md.push_str(&format!(
+        "| Input ({}) | {} |\n",
+        info.input_unit, info.input_count
+    ));
+    md.push_str(&format!("| Analyzed trajectories | {analyzed} |\n"));
+    md.push_str(&format!(
+        "| Parse errors | {} |\n",
+        u(summary, "parse_errors")
+    ));
+    md.push_str(&format!(
+        "| Synthetic controls | {} |\n",
+        u(summary, "synthetic_controls")
+    ));
     md.push_str(&format!(
         "| H3 resolution | res{} |\n",
         pop["metadata"]["h3_resolution"].as_u64().unwrap_or(10)
@@ -65,224 +224,246 @@ pub fn generate_whitepaper(calibration_json: &Value, output_path: &Path) -> std:
             .unwrap_or(300)
     ));
     md.push_str(&format!(
-        "| Min points/trajectory | {} |\n",
+        "| Min points / trajectory | {} |\n\n",
         pop["metadata"]["min_points"].as_u64().unwrap_or(64)
     ));
-    md.push('\n');
 
-    // 3. α 统计
+    // ── 3. α 统计 ───────────────────────────────────────────────────────
     md.push_str("## 3. PSD Scaling Exponent (α) Statistics\n\n");
-    md.push_str("### 3.1 Population Distribution\n\n");
-    md.push_str("| Statistic | Value |\n");
-    md.push_str("|-----------|-------|\n");
-    md.push_str(&format!(
-        "| N (samples) | {} |\n",
-        alpha["n"].as_u64().unwrap_or(0)
-    ));
-    md.push_str(&format!(
-        "| Mean | {:.4} |\n",
-        alpha["mean"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| Std Dev | {:.4} |\n",
-        alpha["std"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| Median | {:.4} |\n",
-        alpha["median"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| P5 | {:.4} |\n",
-        alpha["p05"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| P25 | {:.4} |\n",
-        alpha["p25"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| P75 | {:.4} |\n",
-        alpha["p75"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| P95 | {:.4} |\n",
-        alpha["p95"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| Min | {:.4} |\n",
-        alpha["min"].as_f64().unwrap_or(0.0)
-    ));
-    md.push_str(&format!(
-        "| Max | {:.4} |\n",
-        alpha["max"].as_f64().unwrap_or(0.0)
-    ));
+    md.push_str("### 3.1 Distribution\n\n");
+    md.push_str("| Statistic | Value |\n|-----------|-------|\n");
+    md.push_str(&format!("| N (samples) | {} |\n", u(alpha, "n")));
+    for (label, key) in [
+        ("Mean", "mean"),
+        ("Std Dev", "std"),
+        ("Median", "median"),
+        ("P5", "p05"),
+        ("P25", "p25"),
+        ("P75", "p75"),
+        ("P95", "p95"),
+        ("Min", "min"),
+        ("Max", "max"),
+    ] {
+        md.push_str(&format!("| {label} | {} |\n", f(alpha, key)));
+    }
     md.push('\n');
 
-    // 3.2 生物区间分析
-    md.push_str("### 3.2 Biological Range Analysis\n\n");
+    md.push_str("### 3.2 Biological Range Coverage\n\n");
     let in_range = alpha["in_draft_bio_range"].as_f64().unwrap_or(0.0);
+    let n = alpha["n"].as_f64().unwrap_or(0.0);
     md.push_str(&format!(
-        "- **Draft biological range** [α_min, α_max] = [{:.2}, {:.2}]\n",
-        crate::engine::psd::BIO_ALPHA_MIN,
-        crate::engine::psd::BIO_ALPHA_MAX
+        "- Draft range: **[{BIO_ALPHA_MIN:.2}, {BIO_ALPHA_MAX:.2}]**, center {ALPHA_CENTER:.2}\n"
     ));
     md.push_str(&format!(
-        "- **Samples within range**: {:.1}% ({}/{}\n",
+        "- Samples within range: **{:.1}%** (~{:.0} of {:.0})\n\n",
         in_range * 100.0,
-        (in_range * alpha["n"].as_f64().unwrap_or(0.0)) as u64,
-        alpha["n"].as_u64().unwrap_or(0)
+        in_range * n,
+        n
     ));
-    md.push('\n');
 
-    // 边界推荐
-    if let Some(rec) = pop["recommended_alpha_bounds"].as_object() {
+    if let Some(rec) = pop
+        .get("recommended_alpha_bounds")
+        .filter(|v| !v.is_null())
+        .and_then(Value::as_object)
+    {
         md.push_str("### 3.3 Recommended Boundary Adjustment\n\n");
-        if let (Some(min), Some(max), Some(center), Some(rationale)) = (
-            rec.get("recommended_min").and_then(|v| v.as_f64()),
-            rec.get("recommended_max").and_then(|v| v.as_f64()),
-            rec.get("recommended_center").and_then(|v| v.as_f64()),
-            rec.get("rationale").and_then(|v| v.as_str()),
-        ) {
-            md.push_str(
-                "> **Note**: The following recommendation is based on P5-P95 coverage.\n\n",
-            );
-            md.push_str("| Parameter | Draft | Recommended |\n");
-            md.push_str("|-----------|-------|-------------|\n");
-            md.push_str(&format!(
-                "| α_min | {:.2} | {:.2} |\n",
-                crate::engine::psd::BIO_ALPHA_MIN,
-                min
-            ));
-            md.push_str(&format!(
-                "| α_max | {:.2} | {:.2} |\n",
-                crate::engine::psd::BIO_ALPHA_MAX,
-                max
-            ));
-            md.push_str(&format!(
-                "| α_center | {:.2} | {:.2} |\n",
-                crate::engine::psd::ALPHA_CENTER,
-                center
-            ));
-            md.push('\n');
-            md.push_str(&format!("**Rationale**: {}\n\n", rationale));
+        md.push_str("| Parameter | Draft | Recommended |\n|-----------|-------|-------------|\n");
+        md.push_str(&format!(
+            "| α_min | {BIO_ALPHA_MIN:.2} | {} |\n",
+            f(&Value::Object(rec.clone()), "recommended_min")
+        ));
+        md.push_str(&format!(
+            "| α_max | {BIO_ALPHA_MAX:.2} | {} |\n",
+            f(&Value::Object(rec.clone()), "recommended_max")
+        ));
+        md.push_str(&format!(
+            "| α_center | {ALPHA_CENTER:.2} | {} |\n\n",
+            f(&Value::Object(rec.clone()), "recommended_center")
+        ));
+        if let Some(rationale) = rec.get("rationale").and_then(Value::as_str) {
+            md.push_str(&format!("**Rationale**: {rationale}\n\n"));
         }
     }
 
-    // 4. β 统计
-    if let Some(beta) = pop["beta_stats"].as_object() {
+    // ── 4. β 统计 ───────────────────────────────────────────────────────
+    if let Some(beta) = pop.get("beta_stats").and_then(Value::as_object) {
         if !beta.is_empty() {
             md.push_str("## 4. Levy Stability Parameter (β) Statistics\n\n");
-            md.push_str("| Statistic | Value |\n");
-            md.push_str("|-----------|-------|\n");
-            if let Some(n) = beta.get("n") {
-                md.push_str(&format!("| N | {} |\n", n));
-            }
-            if let Some(m) = beta.get("mean") {
-                md.push_str(&format!("| Mean | {:.4} |\n", m.as_f64().unwrap_or(0.0)));
-            }
-            if let Some(s) = beta.get("std") {
-                md.push_str(&format!("| Std Dev | {:.4} |\n", s.as_f64().unwrap_or(0.0)));
-            }
-            if let Some(med) = beta.get("median") {
-                md.push_str(&format!(
-                    "| Median | {:.4} |\n",
-                    med.as_f64().unwrap_or(0.0)
-                ));
-            }
-            if let Some(p05) = beta.get("p05") {
-                md.push_str(&format!("| P5 | {:.4} |\n", p05.as_f64().unwrap_or(0.0)));
-            }
-            if let Some(p95) = beta.get("p95") {
-                md.push_str(&format!("| P95 | {:.4} |\n", p95.as_f64().unwrap_or(0.0)));
+            md.push_str("| Statistic | Value |\n|-----------|-------|\n");
+            let b = Value::Object(beta.clone());
+            md.push_str(&format!("| N | {} |\n", u(&b, "n")));
+            for (label, key) in [
+                ("Mean", "mean"),
+                ("Std Dev", "std"),
+                ("Median", "median"),
+                ("P5", "p05"),
+                ("P95", "p95"),
+            ] {
+                md.push_str(&format!("| {label} | {} |\n", f(&b, key)));
             }
             md.push('\n');
         }
     }
 
-    // 5. ROC 分析
-    if let Some(roc) = pop["roc"].as_object() {
-        if !roc.is_empty() {
-            md.push_str("## 5. ROC Analysis\n\n");
-            if let Some(optimal) = roc.get("optimal_threshold").and_then(|v| v.as_f64()) {
+    // ── 5. ROC / AUC ────────────────────────────────────────────────────
+    if let Some(roc) = pop.get("roc").filter(|r| !r.is_null()) {
+        md.push_str("## 5. Discriminative Power (ROC / AUC)\n\n");
+        md.push_str(&format!(
+            "Positive class = real human trajectories (**{}**); \
+             negative class = synthetic attack trajectories (**{}**).\n\n",
+            u(roc, "positives"),
+            u(roc, "negatives")
+        ));
+        md.push_str(&format!(
+            "**AUC = {:.4}** (0.5 = chance, 1.0 = perfect)\n\n",
+            roc["auc"].as_f64().unwrap_or(f64::NAN)
+        ));
+        md.push_str(&format!(
+            "**Optimal operating point (Youden's J)**: TPR = {:.4}, FPR = {:.4}\n\n",
+            roc["optimal_tpr"].as_f64().unwrap_or(f64::NAN),
+            roc["optimal_fpr"].as_f64().unwrap_or(f64::NAN)
+        ));
+        if let Some(band) = roc.get("optimal_alpha_band").and_then(Value::as_array) {
+            if band.len() == 2 {
                 md.push_str(&format!(
-                    "**Optimal threshold (Youden's J)**: {:.3}\n\n",
-                    optimal
+                    "**Equivalent α decision band**: α ∈ [{:.4}, {:.4}] \
+                     (scores are `−|α − {ALPHA_CENTER:.2}|`).\n\n",
+                    band[0].as_f64().unwrap_or(f64::NAN),
+                    band[1].as_f64().unwrap_or(f64::NAN)
                 ));
             }
+        }
 
-            md.push_str("### TPR/FPR at Different Thresholds\n\n");
-            md.push_str("| Threshold | TPR | FPR |\n");
-            md.push_str("|-----------|-----|-----|\n");
-
-            if let Some(tpr_at) = roc.get("tpr_at_thresholds").and_then(|v| v.as_array()) {
-                for entry in tpr_at {
-                    if let (Some(thresh), Some(tpr), Some(fpr)) =
-                        (entry.get("threshold"), entry.get("tpr"), entry.get("fpr"))
-                    {
-                        md.push_str(&format!(
-                            "| {:.2} | {:.3} | {:.3} |\n",
-                            thresh.as_f64().unwrap_or(0.0),
-                            tpr.as_f64().unwrap_or(0.0),
-                            fpr.as_f64().unwrap_or(0.0)
-                        ));
-                    }
+        if let Some(families) = calibration_json
+            .get("control_families")
+            .and_then(Value::as_object)
+        {
+            if !families.is_empty() {
+                md.push_str("### 5.1 Control Families\n\n");
+                md.push_str("| Family | N | Mean α | Median α | P5 | P95 |\n");
+                md.push_str("|--------|---|--------|----------|----|-----|\n");
+                for (name, stats) in families {
+                    md.push_str(&format!(
+                        "| `{name}` | {} | {} | {} | {} | {} |\n",
+                        u(stats, "n"),
+                        f(stats, "mean"),
+                        f(stats, "median"),
+                        f(stats, "p05"),
+                        f(stats, "p95"),
+                    ));
                 }
-            }
-            md.push('\n');
-
-            if let Some(auc) = roc.get("auc").and_then(|v| v.as_f64()) {
-                md.push_str(&format!("**AUC**: {:.4}\n\n", auc));
-            } else {
-                md.push_str("*AUC requires control group data (synthetic/bot trajectories).*\n\n");
+                md.push('\n');
             }
         }
+
+        md.push_str("### 5.2 ROC Working Points\n\n");
+        md.push_str("| Threshold (score) | TPR | FPR |\n|-------------------|-----|-----|\n");
+        if let Some(rows) = roc.get("tpr_at_thresholds").and_then(Value::as_array) {
+            for row in rows {
+                md.push_str(&format!(
+                    "| {} | {} | {} |\n",
+                    f(row, "threshold"),
+                    f(row, "tpr"),
+                    f(row, "fpr")
+                ));
+            }
+        }
+        md.push('\n');
+    } else {
+        md.push_str("## 5. Discriminative Power (ROC / AUC)\n\n");
+        md.push_str(
+            "*Not available.* A ROC curve requires a control group: the false-positive \
+             rate is only defined against a population of synthetic/bot trajectories. \
+             Re-run with `--control N` to generate one.\n\n",
+        );
     }
 
-    // 6. 方法论
+    // ── 6. 方法论 ───────────────────────────────────────────────────────
     md.push_str("## 6. Methodology\n\n");
-    md.push_str("### 6.1 Data Processing Pipeline\n\n");
-    md.push_str("1. Parse PLT files (latitude, longitude, timestamp)\n");
-    md.push_str("2. Sort by timestamp, filter intervals < 5 minutes\n");
+    md.push_str("### 6.1 Pipeline\n\n");
+    md.push_str("1. Parse input trajectories (GeoLife PLT, or `engine::sim` synthesis)\n");
+    md.push_str("2. Sort by timestamp; drop consecutive samples < 5 minutes apart\n");
     md.push_str("3. Quantize to H3 resolution 10 (~15,000 m²/cell)\n");
-    md.push_str("4. Extract displacement sequence (haversine distances)\n");
-    md.push_str("5. Compute PSD α via DFT + log-log OLS regression\n");
-    md.push_str("6. Fit Levy distribution via MLE for β, κ estimation\n");
-    md.push_str("7. Bridge consistency check: g = α / (3 - β)\n\n");
+    md.push_str("4. Extract displacement sequence (haversine between cell centers, km)\n");
+    md.push_str("5. PSD α via naive DFT + log-log OLS regression\n");
+    md.push_str("6. Truncated-Levy MLE for β, κ\n");
+    md.push_str("7. Bridge consistency: g = α / (3 − β), expected ∈ [0.3, 0.7]\n");
+    md.push_str("8. ROC against synthetic control families; AUC by trapezoidal integration\n\n");
 
-    md.push_str("### 6.2 Compliance with TRIP Draft-04\n\n");
-    md.push_str("- DFT: Naive O(N²) definition per spec\n");
-    md.push_str("- Frequency normalization: f_k = k/N\n");
-    md.push_str("- Regression: Ordinary Least Squares\n");
-    md.push_str("- R²: SXY²/(SXX·SYY)\n");
-    md.push_str("- All floating point: IEEE-754 f64\n\n");
+    md.push_str("### 6.2 Determinism & Reproducibility\n\n");
+    md.push_str("- DFT: naive O(N²) per spec; frequency f_k = k/N\n");
+    md.push_str("- Regression: ordinary least squares; R² = SXY²/(SXX·SYY)\n");
+    md.push_str("- All floating point is IEEE-754 f64; ROC ties are merged by score\n");
+    md.push_str("- Control families use a fixed seed; identical seed → identical report\n\n");
 
-    // 7. 结论
+    md.push_str("### 6.3 Control Families\n\n");
+    md.push_str("| Family | Generator | Expected α |\n|--------|-----------|------------|\n");
+    md.push_str(
+        "| `iid_levy` | i.i.d. truncated-Levy steps (§7.3.3 literal generator) | ≈ 0 (flat) |\n",
+    );
+    md.push_str("| `replay_drift` | replayed recording + linear drift | ≳ 1.2 (trend) |\n");
+    md.push_str("| `correlated_gaussian` | AR(1) velocity integration | ≳ 1.0 |\n\n");
+
+    // ── 7. 结论 ─────────────────────────────────────────────────────────
     md.push_str("## 7. Conclusions & Recommendations\n\n");
     if bio_frac >= 0.90 {
         md.push_str(
-            "The draft-specified α boundaries appear suitable for the Chinese urban population. ",
+            "The draft-specified α boundaries are **suitable** for this population: \
+             ≥90% of samples fall inside. No adjustment recommended.\n\n",
         );
-        md.push_str("No adjustment is recommended based on this dataset.\n\n");
-    } else {
+    } else if bio_frac >= 0.70 {
         md.push_str(&format!(
-            "The draft boundaries cover only {:.1}% of samples. ",
+            "The draft boundaries cover {:.1}% of samples. This is workable but leaves \
+             a non-trivial tail outside; consider reporting the population-specific \
+             P5–P95 interval alongside the draft range.\n\n",
             bio_frac * 100.0
         ));
-        md.push_str("Consider population-specific calibration or expanded boundaries ");
-        md.push_str("for Chinese urban users.\n\n");
+    } else {
+        md.push_str(&format!(
+            "The draft boundaries cover only **{:.1}%** of samples. Boundary \
+             recalibration should be discussed with the draft authors, with the \
+             method and raw distribution published.\n\n",
+            bio_frac * 100.0
+        ));
+    }
+
+    if let Some(roc) = pop.get("roc").filter(|r| !r.is_null()) {
+        let auc = roc["auc"].as_f64().unwrap_or(f64::NAN);
+        if auc >= 0.9 {
+            md.push_str(&format!(
+                "Single-statistic separation is **strong** (AUC {auc:.4}); α alone is a \
+                 useful first-line filter, though the neural evidence layer remains \
+                 necessary for adversarial cases (GYIP-0003 §4.1).\n\n"
+            ));
+        } else if auc >= 0.7 {
+            md.push_str(&format!(
+                "Single-statistic separation is **moderate** (AUC {auc:.4}); combine with \
+                 the six-component Hamiltonian before making high-stakes decisions.\n\n"
+            ));
+        } else {
+            md.push_str(&format!(
+                "Single-statistic separation is **weak** (AUC {auc:.4}); α alone must not \
+                 be used as a decision boundary.\n\n"
+            ));
+        }
     }
 
     md.push_str("### Future Work\n\n");
-    md.push_str("- [ ] Add control group: synthetic/bot trajectories for true AUC\n");
-    md.push_str("- [ ] Include MDC (Lausanne) dataset for European population comparison\n");
-    md.push_str("- [ ] Include T-Drive (Beijing taxi) as occupational bias reference\n");
+    md.push_str("- [ ] Add MDC (Lausanne) for cross-population comparison\n");
+    md.push_str("- [ ] Add T-Drive (Beijing taxi) as an occupational-bias reference\n");
     md.push_str("- [ ] Subgroup analysis by mobility pattern (commuter vs. tourist)\n");
-    md.push_str("- [ ] Temporal drift monitoring for seasonal effects\n\n");
+    md.push_str("- [ ] Temporal drift monitoring for seasonal effects\n");
+    md.push_str("- [ ] Bootstrap confidence intervals for AUC and α quantiles\n\n");
 
-    // 附录
     md.push_str("---\n\n");
-    md.push_str("*This report was auto-generated by trip-core calibration module (W7).*\n");
-    md.push_str("*GeoYuan / TRIP Team · For IETF RATS companion publication.*\n");
+    md.push_str("*Auto-generated by `trip-core::engine::calibration_report` (W7).*\n");
+    md.push_str("*GeoYuan / TRIP Team · companion material for IETF RATS.*\n");
 
+    if let Some(parent) = output_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
     fs::write(output_path, md)?;
     Ok(())
 }
@@ -292,74 +473,119 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    #[test]
-    fn test_generate_whitepaper() {
-        let json = json!({
-            "calibration_type": "geolife_real_data",
+    fn sample_report() -> Value {
+        json!({
+            "calibration_type": "synthetic",
+            "dataset": {
+                "name": "Synthetic (trip_walk)",
+                "source": "trip-core engine::sim",
+                "input_unit": "synthetic trajectories",
+                "input_count": 60
+            },
             "summary": {
-                "total_plt_files": 100,
-                "analyzed_trajectories": 85,
-                "parse_errors": 5
+                "analyzed_trajectories": 60,
+                "parse_errors": 0,
+                "synthetic_controls": 180
+            },
+            "control_families": {
+                "iid_levy": { "n": 60, "mean": -0.02, "median": 0.0, "p05": -0.9, "p95": 0.9 },
+                "replay_drift": { "n": 60, "mean": 1.63, "median": 1.6, "p05": 1.1, "p95": 2.1 },
+                "correlated_gaussian": { "n": 60, "mean": 1.99, "median": 2.0, "p05": 1.5, "p95": 2.4 }
             },
             "population_report": {
-                "dataset": "GeoLife (Beijing)",
-                "total_trajectories": 100,
-                "analyzed_trajectories": 85,
+                "dataset": "Synthetic (trip_walk)",
+                "total_trajectories": 60,
+                "analyzed_trajectories": 60,
                 "alpha_stats": {
-                    "n": 85,
-                    "mean": 0.52,
-                    "std": 0.18,
-                    "median": 0.51,
-                    "p05": 0.22,
-                    "p25": 0.40,
-                    "p75": 0.65,
-                    "p95": 0.82,
-                    "min": 0.15,
-                    "max": 1.10,
-                    "in_draft_bio_range": 0.82
+                    "n": 60, "mean": 0.58, "std": 0.12, "median": 0.57,
+                    "p05": 0.35, "p25": 0.48, "p75": 0.66, "p95": 0.79,
+                    "min": 0.20, "max": 0.95, "in_draft_bio_range": 0.92
                 },
-                "beta_stats": {
-                    "n": 85,
-                    "mean": 1.72,
-                    "std": 0.18,
-                    "median": 1.71,
-                    "p05": 1.45,
-                    "p95": 2.01
-                },
-                "bio_fraction": 0.82,
+                "beta_stats": { "n": 60, "mean": 1.72, "std": 0.18, "median": 1.71, "p05": 1.45, "p95": 2.01 },
+                "bio_fraction": 0.92,
                 "recommended_alpha_bounds": null,
                 "roc": {
                     "tpr_at_thresholds": [
-                        {"threshold": 0.0, "tpr": 1.0, "fpr": 0.18},
-                        {"threshold": 0.3, "tpr": 0.88, "fpr": 0.08},
-                        {"threshold": 0.55, "tpr": 0.62, "fpr": 0.02}
+                        {"threshold": -0.05, "tpr": 0.95, "fpr": 0.12},
+                        {"threshold": -0.25, "tpr": 0.70, "fpr": 0.04}
                     ],
-                    "optimal_threshold": 0.35,
-                    "auc": null
+                    "optimal_threshold": -0.25,
+                    "optimal_tpr": 0.70,
+                    "optimal_fpr": 0.04,
+                    "auc": 0.94,
+                    "positives": 60,
+                    "negatives": 180,
+                    "optimal_alpha_band": [0.30, 0.80]
                 },
                 "metadata": {
                     "h3_resolution": 10,
                     "min_time_gap_seconds": 300,
                     "min_points": 64,
+                    "analyzed_at": "2026-09-25T00:00:00Z",
+                    "protocol_version": "draft-ayerbe-trip-protocol-04"
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn test_generate_whitepaper() {
+        let json = sample_report();
+        let output = std::env::temp_dir().join("test_whitepaper.md");
+        generate_whitepaper(&json, &output).expect("generate");
+        let content = fs::read_to_string(&output).expect("read");
+
+        assert!(content.contains("# Synthetic (trip_walk) — Population Calibration Report"));
+        assert!(content.contains("Executive Summary"));
+        assert!(content.contains("PSD Scaling Exponent"));
+        assert!(content.contains("Discriminative Power"));
+        assert!(content.contains("AUC = 0.9400"));
+        assert!(content.contains("iid_levy"));
+        // 时间戳不得带 JSON 引号
+        assert!(content.contains("**Generated**: 2026-09-25T00:00:00Z"));
+        assert!(!content.contains("\"2026-09-25"));
+
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn test_whitepaper_without_roc_is_explicit() {
+        let mut json = sample_report();
+        json["population_report"]["roc"] = Value::Null;
+        json["control_families"] = json!({});
+        let output = std::env::temp_dir().join("test_whitepaper_noroc.md");
+        generate_whitepaper(&json, &output).expect("generate");
+        let content = fs::read_to_string(&output).expect("read");
+        assert!(content.contains("no control group supplied"));
+        assert!(content.contains("Re-run with `--control N`"));
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn test_whitepaper_falls_back_for_legacy_json() {
+        // 无 dataset 块、无 calibration_type 的旧格式：仍应渲染出标题与 PLT 单位。
+        let json = json!({
+            "summary": { "total_plt_files": 100, "analyzed_trajectories": 85, "parse_errors": 5 },
+            "population_report": {
+                "dataset": "GeoLife (Beijing)",
+                "total_trajectories": 100,
+                "analyzed_trajectories": 85,
+                "alpha_stats": { "n": 85, "mean": 0.52, "in_draft_bio_range": 0.82 },
+                "beta_stats": {},
+                "bio_fraction": 0.82,
+                "metadata": {
+                    "h3_resolution": 10, "min_time_gap_seconds": 300, "min_points": 64,
                     "analyzed_at": "2026-09-20T00:00:00Z",
                     "protocol_version": "draft-ayerbe-trip-protocol-04"
                 }
             }
         });
-
-        let tmp_dir = std::env::temp_dir();
-        let output = tmp_dir.join("test_whitepaper.md");
-
-        let result = generate_whitepaper(&json, &output);
-        assert!(result.is_ok());
-
-        let content = fs::read_to_string(&output).unwrap();
-        assert!(content.contains("# GeoLife"));
-        assert!(content.contains("Executive Summary"));
-        assert!(content.contains("PSD Scaling Exponent"));
-        assert!(content.contains("ROC Analysis"));
-
-        // 清理
+        let output = std::env::temp_dir().join("test_whitepaper_legacy.md");
+        generate_whitepaper(&json, &output).expect("generate");
+        let content = fs::read_to_string(&output).expect("read");
+        assert!(content.contains("GeoLife (Beijing)"));
+        assert!(content.contains("PLT files"));
+        assert!(content.contains("100"));
         let _ = fs::remove_file(output);
     }
 }

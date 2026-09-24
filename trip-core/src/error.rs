@@ -57,6 +57,10 @@ pub enum TripError {
     #[error("anchor error: {0}")]
     Anchor(String),
 
+    /// 标定 / ROC 分析错误（样本不足、标签缺失、区间退化）。
+    #[error("calibration error: {0}")]
+    Calibration(String),
+
     /// I/O 错误（文件读写等）。
     #[error("io error: {0}")]
     Io(String),
