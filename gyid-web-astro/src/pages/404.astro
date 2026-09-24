@@ -1,0 +1,21 @@
+---
+/**
+ * 站点 404 页。
+ *
+ * Astro 对 `404.astro` 有特殊约定：无视 `build.format`，一律输出根目录下的
+ * `404.html`，正好可以交给服务器当错误页；nginx 侧对应
+ * `error_page 404 /404.html;`。
+ *
+ * 之所以不能挂在 `[...slug]` 的页面注册表上：注册表键 `404` 会被 TypeScript
+ * 推断为 **number** 字面量，污染 `PageSlug` 类型（`slug` 是 string），且根级
+ * 动态路由产不出 `404/index.html`。
+ *
+ * 正文复用组件，未来若要做 `/zh/404` 可再次引用。
+ */
+import Layout from '../layouts/Layout.astro';
+import NotFound from '../components/pages/NotFound.astro';
+---
+
+<Layout title="404">
+  <NotFound lang="en" />
+</Layout>

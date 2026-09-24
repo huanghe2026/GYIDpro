@@ -1,0 +1,240 @@
+---
+import { ui, path, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const zh = lang === 'zh';
+const back = path(lang, 'docs');
+
+const methodClass: Record<string, string> = {
+  GET: 'text-cyber-blue border-cyber-blue/35 bg-cyber-blue/10',
+  POST: 'text-cyber-yellow border-cyber-yellow/35 bg-cyber-yellow/10',
+  WS: 'text-cyber-purple border-cyber-purple/35 bg-cyber-purple/10',
+};
+
+const endpoints = zh
+  ? [
+      {
+        m: 'GET',
+        p: '/.well-known/verifier.json',
+        d: '验证方公钥与策略门槛',
+        res: `{
+  "verifier": "trip-server",
+  "verifier_pubkey": "<64 hex>",
+  "protocol": "draft-ayerbe-trip-protocol-04",
+  "validity_secs": 3600,
+  "challenge_ttl_secs": 60,
+  "policy": { "alpha_bio_range": [0.3, 0.8], "min_confidence": 0.1, "min_trust": 20.0 }
+}`,
+      },
+      {
+        m: 'POST',
+        p: '/v1/evidence',
+        d: '提交一批已签名面包屑（CBOR 帧流，body 为二进制）',
+        res: `{ "stored": 116, "unique_cells": 116, "chain_head": "<64 hex>" }
+
+// 400 —— 违反链规则时
+{ "error": "invalid breadcrumb chain: duplicate h3 cell ... at consecutive index 1" }`,
+      },
+      {
+        m: 'GET',
+        p: '/v1/identity/:pubkey_hex',
+        d: '某 attester 的链状态；尚无证据时返回 404',
+        res: `{
+  "attester": "<64 hex>",
+  "breadcrumb_count": 116,
+  "unique_cells": 116,
+  "chain_head": "<64 hex>",
+  "last_ts": 1790397900
+}`,
+      },
+      {
+        m: 'POST',
+        p: '/v1/verify',
+        d: '创建绑定 RP nonce 的挑战（主动验证第一步）',
+        res: `// 请求
+{ "attester": "<64 hex>", "rp_nonce": "<32 hex>", "ttl_secs": 90 }
+
+// 响应
+{ "challenge_id": "<32 hex>", "expires_at": 1790397960, "delivered": true }`,
+      },
+      {
+        m: 'WS',
+        p: '/v1/challenge?attester=<pubkey_hex>',
+        d: '实时通道：服务端下发 LivenessChallenge（二进制 CBOR 帧），Attester 回送 LivenessResponse',
+        res: `// 客户端连接后先发注册帧
+{ "type": "hello", "attester": "<64 hex>" }
+
+// 之后为二进制帧：challenge 下行 / response 上行
+// 服务端回执（文本帧）示例：
+{ "type": "poh_issued", "ok": true, "alpha": 0.441, "beta": 3.0,
+  "confidence": 0.0597, "trust": 63.27, "meets_policy": false }`,
+      },
+      {
+        m: 'GET',
+        p: '/v1/poh/:challenge_id',
+        d: '取回已签发的 PoH 证书（CBOR 二进制）；未就绪时 202',
+        res: `// 202 —— 尚未签发
+{ "status": "pending", "expires_at": 1790397960 }
+
+// 200 —— CBOR 证书（15 字段，见协议页）`,
+      },
+      {
+        m: 'GET',
+        p: '/v1/explorer',
+        d: '本验证方已知全部 attester 的聚合视图（不含任何位置数据）',
+        res: `{ "attesters": [ { "pubkey": "<64 hex>", "breadcrumb_count": 116, "unique_cells": 116, "last_ts": 1790397900 } ] }`,
+      },
+    ]
+  : [
+      {
+        m: 'GET',
+        p: '/.well-known/verifier.json',
+        d: 'Verifier public key and policy thresholds',
+        res: `{
+  "verifier": "trip-server",
+  "verifier_pubkey": "<64 hex>",
+  "protocol": "draft-ayerbe-trip-protocol-04",
+  "validity_secs": 3600,
+  "challenge_ttl_secs": 60,
+  "policy": { "alpha_bio_range": [0.3, 0.8], "min_confidence": 0.1, "min_trust": 20.0 }
+}`,
+      },
+      {
+        m: 'POST',
+        p: '/v1/evidence',
+        d: 'Submit a batch of signed breadcrumbs (CBOR frame stream, binary body)',
+        res: `{ "stored": 116, "unique_cells": 116, "chain_head": "<64 hex>" }
+
+// 400 — chain rule violation
+{ "error": "invalid breadcrumb chain: duplicate h3 cell ... at consecutive index 1" }`,
+      },
+      {
+        m: 'GET',
+        p: '/v1/identity/:pubkey_hex',
+        d: 'Chain state for one attester; 404 when there is no evidence yet',
+        res: `{
+  "attester": "<64 hex>",
+  "breadcrumb_count": 116,
+  "unique_cells": 116,
+  "chain_head": "<64 hex>",
+  "last_ts": 1790397900
+}`,
+      },
+      {
+        m: 'POST',
+        p: '/v1/verify',
+        d: 'Create a challenge bound to an RP nonce (first step of Active Verification)',
+        res: `// request
+{ "attester": "<64 hex>", "rp_nonce": "<32 hex>", "ttl_secs": 90 }
+
+// response
+{ "challenge_id": "<32 hex>", "expires_at": 1790397960, "delivered": true }`,
+      },
+      {
+        m: 'WS',
+        p: '/v1/challenge?attester=<pubkey_hex>',
+        d: 'Real-time channel: the verifier pushes a LivenessChallenge (binary CBOR), the attester returns a LivenessResponse',
+        res: `// the client registers first
+{ "type": "hello", "attester": "<64 hex>" }
+
+// then binary frames: challenge down, response up
+// example text ack from the verifier:
+{ "type": "poh_issued", "ok": true, "alpha": 0.441, "beta": 3.0,
+  "confidence": 0.0597, "trust": 63.27, "meets_policy": false }`,
+      },
+      {
+        m: 'GET',
+        p: '/v1/poh/:challenge_id',
+        d: 'Fetch the issued PoH certificate (CBOR); 202 while pending',
+        res: `// 202 — not issued yet
+{ "status": "pending", "expires_at": 1790397960 }
+
+// 200 — the CBOR certificate (15 fields, see the protocol page)`,
+      },
+      {
+        m: 'GET',
+        p: '/v1/explorer',
+        d: 'Aggregate view over every attester known to this verifier (no location data at all)',
+        res: `{ "attesters": [ { "pubkey": "<64 hex>", "breadcrumb_count": 116, "unique_cells": 116, "last_ts": 1790397900 } ] }`,
+      },
+    ];
+
+const errors = zh
+  ? [
+      ['400', '链规则违规（同 cell、间隔不足、index 不连续、prev hash 不匹配）', '修正轨迹或丢弃违规面包屑后重试'],
+      ['404', '/v1/verify 找不到该 attester：该身份尚未上传任何证据', '先在 Collect/Import 页上传面包屑'],
+      ['404', '/v1/identity/:hex：该身份在验证方处无记录', '同上'],
+      ['202', '/v1/poh/:id 尚未签发（Attester 还没应答挑战）', '轮询直到 200 或超时'],
+      ['429', '请求限流', '退避后重试'],
+    ]
+  : [
+      ['400', 'Chain rule violation (same cell, interval too short, non-contiguous index, prev-hash mismatch)', 'Fix the trajectory or drop the violating breadcrumb and retry'],
+      ['404', '/v1/verify cannot find the attester: no evidence uploaded yet', 'Upload breadcrumbs on the Collect/Import tab first'],
+      ['404', '/v1/identity/:hex: the verifier has no record of this identity', 'Same as above'],
+      ['202', '/v1/poh/:id not issued yet (the attester has not answered the challenge)', 'Poll until 200 or until it times out'],
+      ['429', 'Rate limited', 'Back off and retry'],
+    ];
+---
+
+<div class="mx-auto max-w-4xl px-4 py-14">
+  <a href={back} class="font-mono text-xs text-cyber-blue hover:underline">← {t.docs.backToDocs}</a>
+  <h1 class="mt-4 text-3xl font-black tracking-tight text-white">{t.docs.apiTitle}</h1>
+  <p class="mt-4 text-base leading-relaxed text-white/65">{t.docs.apiLead}</p>
+  <p class="mt-3 font-mono text-xs text-white/40">
+    base URL: <code class="text-cyber-cyan">https://gyid.geoyuan.com</code>
+  </p>
+
+  <div class="mt-10 space-y-6">
+    {
+      endpoints.map((e) => (
+        <article class="cyber-border p-5">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class:list={['badge', methodClass[e.m]]}>{e.m}</span>
+            <code class="font-mono text-sm text-white/90">{e.p}</code>
+          </div>
+          <p class="mt-3 text-sm text-white/60">{e.d}</p>
+          <pre class="mt-4 overflow-x-auto rounded-lg border border-white/[0.08] bg-gy-panel p-4 font-mono text-[11px] leading-relaxed text-white/75"><code>{e.res}</code></pre>
+        </article>
+      ))
+    }
+  </div>
+
+  <div class="prose-gyid mt-12">
+    <h2>{zh ? '错误码' : 'Error codes'}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>{zh ? '码' : 'Code'}</th><th>{zh ? '含义' : 'Meaning'}</th><th>{zh ? '处理' : 'What to do'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {errors.map((r) => (
+          <tr>{r.map((c) => <td>{c}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>{zh ? '同源与实时通道' : 'Same-origin and the real-time channel'}</h2>
+    <p>
+      {
+        zh
+          ? '本站的验证方与页面同源（https://gyid.geoyuan.com），因此前端无需配置后端地址，也不存在 CORS 或混合内容问题。WebSocket 走 wss://gyid.geoyuan.com/v1/challenge，由 nginx 升级连接并反代到本机 trip-server。'
+          : 'The verifier on this domain is same-origin with the pages (https://gyid.geoyuan.com), so the front-end needs no backend URL and there is no CORS or mixed-content concern. The WebSocket goes to wss://gyid.geoyuan.com/v1/challenge, upgraded and proxied by nginx to the local trip-server.'
+      }
+    </p>
+
+    <h2>{zh ? '隐私边界' : 'Privacy boundary'}</h2>
+    <p>
+      {
+        zh
+          ? '上述任何端点都不接受也不返回原始坐标。客户端送出的是已量化的 H3 网格与签名；服务端返回的是统计量与聚合计数。这不是策略约定，而是数据结构本身没有承载坐标的字段。'
+          : 'None of these endpoints accept or return raw coordinates. The client sends quantized H3 cells and signatures; the server returns statistics and aggregate counts. This is not a policy promise — the data structures simply have no field that could carry a coordinate.'
+      }
+    </p>
+  </div>
+</div>

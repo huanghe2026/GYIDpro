@@ -12,9 +12,23 @@ import Verify from "./pages/Verify";
 import Certificates from "./pages/Certificates";
 import Explorer from "./pages/Explorer";
 
+/**
+ * 客户端路由 base：与 Vite 的 `base` 保持一致。
+ *
+ * - 默认构建 `base: "./"`（相对）→ 路由 base 用 `/`（现状不变）；
+ * - 子路径部署 `VITE_BASE_PATH=/app/` → 路由 base 用 `/app`（去掉尾斜杠）。
+ *
+ * 这样同一份代码既能嵌入任意静态目录，也能挂在 `https://host/app/` 下。
+ */
+const routerBase = (() => {
+  const raw = import.meta.env.BASE_URL;
+  if (!raw.startsWith("/")) return "/";
+  return raw.replace(/\/+$/, "") || "/";
+})();
+
 export default function App() {
   return (
-    <Router>
+    <Router base={routerBase}>
       {/* 公开门户 */}
       <Route path="/" component={PortalLayout}>
         <Route path="/" component={Home} />

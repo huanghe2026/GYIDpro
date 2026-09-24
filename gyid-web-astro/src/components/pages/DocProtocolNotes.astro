@@ -1,0 +1,155 @@
+---
+import { ui, path, SITE, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const zh = lang === 'zh';
+const back = path(lang, 'docs');
+
+const rows = zh
+  ? [
+      ['0', 'index', 'u64', '链内序号，从 0 起严格连续', '与服务端校验一致'],
+      ['1', 'identity', 'bstr(32)', 'Attester 的 Ed25519 公钥', '同一条链固定不变'],
+      ['2', 'timestamp', 'u64', 'Unix 秒', '决定 §4.1/§4.2 间隔规则'],
+      ['3', 'h3 cell', 'u64', 'H3 网格（hex 传输，避免 JS 精度丢失）', 'res10 约 15,000 m²'],
+      ['4', 'resolution', 'u8', '7..=10', '本实现默认 10'],
+      ['5', 'context digest', 'bstr(32)', 'h3／时间桶／Wi-Fi／基站／IMU 的 SHA-256', '缺失分量整体省略'],
+      ['6', 'prev hash', 'bstr(32) | null', '上一块哈希；创世为 null', '构成哈希链'],
+      ['7', 'meta flags', 'map', '含 exploration 会话标志', '§4.2'],
+      ['8', 'signature', 'bstr(64)', '覆盖字段 0–7 的确定性 CBOR', 'Ed25519'],
+    ]
+  : [
+      ['0', 'index', 'u64', 'Position in the chain, contiguous from 0', 'Enforced identically on the verifier'],
+      ['1', 'identity', 'bstr(32)', 'Ed25519 public key of the attester', 'Constant for the whole chain'],
+      ['2', 'timestamp', 'u64', 'Unix seconds', 'Drives the §4.1 / §4.2 interval rules'],
+      ['3', 'h3 cell', 'u64', 'H3 cell (transported as hex to avoid JS precision loss)', 'res 10 is about 15,000 m²'],
+      ['4', 'resolution', 'u8', '7 to 10', 'This implementation defaults to 10'],
+      ['5', 'context digest', 'bstr(32)', 'SHA-256 over h3 / time bucket / Wi-Fi / cell / IMU', 'Missing parts are omitted entirely'],
+      ['6', 'prev hash', 'bstr(32) | null', 'Previous block hash; null at genesis', 'Forms the hash chain'],
+      ['7', 'meta flags', 'map', 'Includes the exploration session flag', '§4.2'],
+      ['8', 'signature', 'bstr(64)', 'Covers the deterministic CBOR of fields 0–7', 'Ed25519'],
+    ];
+
+const gaps = zh
+  ? [
+      ['传输绑定', '草案未规定', 'libp2p 中继、多验证方与实时挑战通道（companion draft 方向）', 'trip-server WS + GPv1 设计'],
+      ['命名系统', '草案未规定', 'did:geoyuan + W3C DID Document；展示名走 alsoKnownAs', 'trip-core::did'],
+      ['区块链锚定', '草案未规定', 'epoch 根的 EVM 锚定与撤销模型（不发币、不锚轨迹）', 'GeoTITRegistry.sol'],
+      ['TIT 字段编号', '草案未规定', 'GYIP-0003 内部约定；待 -05 规范后重新 pin', 'trip-core::tit + 黄金向量'],
+    ]
+  : [
+      ['Transport binding', 'Not specified', 'libp2p relay, multiple verifiers, real-time challenge channel (companion draft direction)', 'trip-server WS + GPv1 design'],
+      ['Naming system', 'Not specified', 'did:geoyuan + W3C DID Document; display names go in alsoKnownAs', 'trip-core::did'],
+      ['Blockchain anchoring', 'Not specified', 'EVM anchoring of epoch roots and a revocation model (no tokens, no trajectory anchoring)', 'GeoTITRegistry.sol'],
+      ['TIT field numbering', 'Not specified', 'A GYIP-0003 internal convention; to be re-pinned once -05 lands', 'trip-core::tit + golden vectors'],
+    ];
+
+const decisions = zh
+  ? [
+      ['确定性 CBOR', 'RFC 8949 §4.2 规范序，任何平台同逻辑同字节', '黄金向量 tests/vectors/golden-vectors.json'],
+      ['PSD 数值约定', '朴素 O(N²) DFT、f_k = k/N、普通最小二乘、IEEE-754 f64', 'α 跨实现偏差 < 1e-9'],
+      ['Levy 归一化', '代换 t = u·e^s 后的 512 节点复化 Simpson', '偏差 < 1e-9'],
+      ['分位数', '线性插值 rank = p·(n−1)', '标定报告可复现'],
+      ['ROC', '阈值降序扫描 + 同分合并 + FPR 轴梯形 AUC', '消除并列顺序依赖'],
+    ]
+  : [
+      ['Deterministic CBOR', 'RFC 8949 §4.2 canonical form; same logic yields identical bytes on any platform', 'Golden vectors in tests/vectors/golden-vectors.json'],
+      ['PSD numeric conventions', 'Naive O(N²) DFT, f_k = k/N, ordinary least squares, IEEE-754 f64', 'Cross-implementation α drift below 1e-9'],
+      ['Lévy normalisation', '512-node composite Simpson after the substitution t = u·e^s', 'Drift below 1e-9'],
+      ['Quantiles', 'Linear interpolation with rank = p·(n−1)', 'Calibration reports are reproducible'],
+      ['ROC', 'Descending threshold sweep, ties merged, trapezoidal AUC over FPR', 'No dependence on tie ordering'],
+    ];
+---
+
+<div class="mx-auto max-w-4xl px-4 py-14">
+  <a href={back} class="font-mono text-xs text-cyber-blue hover:underline">← {t.docs.backToDocs}</a>
+  <h1 class="mt-4 text-3xl font-black tracking-tight text-white">{t.docs.cards[0].title}</h1>
+  <p class="mt-4 text-base leading-relaxed text-white/65">{t.docs.cards[0].desc}</p>
+  <p class="mt-3 font-mono text-xs text-white/40">{SITE.draft}</p>
+
+  <div class="prose-gyid mt-10">
+    <h2>{zh ? '1. 面包屑字段' : '1. Breadcrumb fields'}</h2>
+    <p>
+      {
+        zh
+          ? '面包屑是 CBOR map，键为 0–8 的整数。签名覆盖字段 0–7 的确定性 CBOR；块哈希是完整编码（0–8）的 SHA-256。'
+          : 'A breadcrumb is a CBOR map keyed by the integers 0–8. The signature covers the deterministic CBOR of fields 0–7; the block hash is SHA-256 over the full encoding (0–8).'
+      }
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>key</th><th>name</th><th>type</th><th>{zh ? '含义' : 'meaning'}</th><th>{zh ? '备注' : 'notes'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr>{r.map((c) => <td>{c}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>{zh ? '2. 草案留白与本实现的选择' : '2. Where the draft is silent, and what this implementation chose'}</h2>
+    <p>
+      {
+        zh
+          ? '草案明确把传输绑定、命名系统与区块链锚定留给 companion specifications。这不是缺陷，而是邀请。'
+          : 'The draft deliberately leaves transport binding, naming and blockchain anchoring to companion specifications. That is an invitation rather than a gap.'
+      }
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>{zh ? '留白' : 'Gap'}</th><th>{zh ? '草案' : 'Draft'}</th>
+          <th>{zh ? '本实现' : 'This implementation'}</th><th>{zh ? '代码位置' : 'Where'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {gaps.map((r) => (
+          <tr>{r.map((c) => <td>{c}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>{zh ? '3. 数值确定性' : '3. Numeric determinism'}</h2>
+    <p>
+      {
+        zh
+          ? '跨实现互操作要求同一逻辑产生同一字节。以下约定被黄金向量锁定，任何语言按相同步骤实现都应落在给定容差内。'
+          : 'Interoperability requires the same logic to produce the same bytes. The following conventions are pinned by golden vectors; any language following the same steps should land within the stated tolerance.'
+      }
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>{zh ? '主题' : 'Topic'}</th><th>{zh ? '约定' : 'Convention'}</th><th>{zh ? '验证' : 'Verified by'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {decisions.map((r) => (
+          <tr>{r.map((c) => <td>{c}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>{zh ? '4. 链规则的正副实现' : '4. Chain rules, implemented twice'}</h2>
+    <p>
+      {
+        zh
+          ? '同一条规则在端上（WASM，拒绝写入本地链）与服务端（Rust，拒绝写入证据库）各实现一次。两者独立，因此单侧被绕过时另一侧仍会拦截——这也是本站端到端测试观察到 400 响应的原因。'
+          : 'Each rule exists twice: on device (WASM, refusing to append to the local chain) and on the verifier (Rust, refusing to store the evidence). They are independent, so defeating one still leaves the other — which is exactly why the end-to-end test observes 400 responses.'
+      }
+    </p>
+    <blockquote>
+      {
+        zh
+          ? '实测：注入固定坐标连续采集两条时，前端「全链自检」与服务端 POST /v1/evidence 都拒绝，服务端返回 duplicate h3 cell at consecutive index 1。'
+          : 'Observed: collecting two breadcrumbs at a fixed coordinate makes both the client self-check and the server reject, with the server returning “duplicate h3 cell at consecutive index 1”.'
+      }
+    </blockquote>
+  </div>
+</div>

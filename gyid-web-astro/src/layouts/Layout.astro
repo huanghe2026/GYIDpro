@@ -1,0 +1,66 @@
+---
+// 全站布局：字体自托管（Fontsource）+ 双语 + 主题色。
+// 字体策略与 diliy.cn 一致：中英正文各用可变字体，按语言只挂载一种，
+// Orbitron / JetBrains Mono 只取实际用到的字重。
+import '../styles/global.css';
+import '@fontsource/orbitron/700.css';
+import '@fontsource/orbitron/900.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/700.css';
+import interCssUrl from '@fontsource-variable/inter/wght.css?url';
+import notoScCssUrl from '@fontsource-variable/noto-sans-sc/wght.css?url';
+
+import { ViewTransitions } from 'astro:transitions';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { ui, SITE, type Lang } from '../i18n/ui';
+
+interface Props {
+  /** 当前页在语言内的 slug（'' 表示首页），用于语言切换与导航高亮 */
+  slug?: string;
+  title?: string;
+  description?: string;
+}
+
+const lang: Lang = ((Astro.currentLocale as Lang) ?? 'en') satisfies Lang;
+const t = ui[lang];
+const { slug = '', title, description } = Astro.props;
+const isEn = lang === 'en';
+
+const pageTitle = title ? `${title} — ${t.meta.siteTitle}` : t.meta.siteTitle;
+const pageDesc = description ?? t.meta.description;
+const canonical = `${SITE.origin}${Astro.url.pathname}`;
+---
+
+<!doctype html>
+<html lang={t.htmlLang} data-locale={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={pageDesc} />
+    <meta name="theme-color" content="#020617" />
+    <meta name="msapplication-TileColor" content="#020617" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
+    <title>{pageTitle}</title>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    {isEn ? <link rel="stylesheet" href={interCssUrl} /> : <link rel="stylesheet" href={notoScCssUrl} />}
+
+    {/* 客户端换页：让控制台的模块状态（含解锁后的内存 seed）跨页保持 */}
+    <ViewTransitions />
+  </head>
+  <body class="min-h-screen antialiased">
+    <Header lang={lang} slug={slug} />
+    <main>
+      <slot />
+    </main>
+    <Footer lang={lang} />
+  </body>
+</html>

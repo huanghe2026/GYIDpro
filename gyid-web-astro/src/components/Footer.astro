@@ -1,0 +1,96 @@
+---
+import { ui, navItems, path, SITE, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const year = new Date().getFullYear();
+const items = navItems(t);
+const resources = t.docs.cards.map((c) => ({ slug: c.slug, label: c.title }));
+---
+
+<footer class="mt-20 border-t border-white/[0.08] bg-black/40">
+  <div class="mx-auto max-w-6xl px-4 py-12">
+    <div class="grid gap-10 md:grid-cols-4">
+      <div class="md:col-span-2">
+        <div class="flex items-center gap-2">
+          <span
+            class="grid h-8 w-8 place-items-center rounded-lg border border-cyber-blue/40 bg-cyber-blue/10 font-cyber text-sm font-black text-cyber-blue"
+            >G</span
+          >
+          <span class="font-cyber text-base font-black tracking-wide text-white">TRIP·GyID</span>
+        </div>
+        <p class="mt-4 max-w-sm text-sm leading-relaxed text-white/60">{t.footer.tagline}</p>
+        <p class="mt-4 font-mono text-xs text-white/40">
+          {t.footer.draftNote}
+          <code class="text-cyber-cyan">{SITE.draft}</code>
+        </p>
+      </div>
+
+      <div>
+        <h3 class="font-cyber text-xs font-bold uppercase tracking-widest text-cyber-blue">
+          {t.footer.product}
+        </h3>
+        <ul class="mt-4 space-y-2 text-sm">
+          {
+            items.map((item) => (
+              <li>
+                <a href={path(lang, item.slug)} class="text-white/60 transition hover:text-cyber-blue">
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+          <li>
+            <a href={path(lang, 'console')} class="text-white/60 transition hover:text-cyber-blue">
+              {t.nav.console}
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="font-cyber text-xs font-bold uppercase tracking-widest text-cyber-blue">
+          {t.footer.resources}
+        </h3>
+        <ul class="mt-4 space-y-2 text-sm">
+          {
+            resources.map((r) => (
+              <li>
+                <a href={path(lang, r.slug)} class="text-white/60 transition hover:text-cyber-blue">
+                  {r.label}
+                </a>
+              </li>
+            ))
+          }
+          <li>
+            <a
+              href={SITE.github}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-white/60 transition hover:text-cyber-blue">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div
+      class="mt-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.06] pt-6 font-mono text-xs text-white/40"
+    >
+      <span>© {year} Geoyuan Team</span>
+      <span class="text-white/20">·</span>
+      <span>{t.footer.rights}</span>
+      <span class="text-white/20">·</span>
+      <a
+        href="https://beian.miit.gov.cn"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="underline transition hover:text-cyber-blue">{SITE.icp}</a
+      >
+    </div>
+  </div>
+</footer>

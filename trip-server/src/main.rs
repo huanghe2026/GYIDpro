@@ -1,15 +1,12 @@
 //! trip-server 二进制入口。
 
-use std::net::SocketAddr;
-
 use axum::http::{header, HeaderValue, Method};
-use axum::serve;
-use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use trip_server::config::load_verifier_key;
+use trip_server::listen::{serve, ListenTarget};
 use trip_server::{build_router, chain::ChainRelay, AppState, Config};
 
 #[tokio::main]
@@ -20,7 +17,8 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::from_env();
-    let listen: SocketAddr = config.listen.parse()?;
+    // `127.0.0.1:8080` 走 TCP；`unix:/run/trip-server.sock` 走 Unix socket（零 TCP 端口）。
+    let target = ListenTarget::parse(&config.listen)?;
     let verifier_key = load_verifier_key();
     let verifier_pubkey = verifier_key.public_bytes();
 
@@ -69,12 +67,11 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(cors);
 
-    let listener = TcpListener::bind(listen).await?;
     tracing::info!(
-        %listen,
+        listen = %target.describe(),
         verifier_pubkey = %hex::encode(verifier_pubkey),
-        "trip-server listening"
+        "trip-server starting"
     );
-    serve(listener, app).await?;
+    serve(target, app).await?;
     Ok(())
 }

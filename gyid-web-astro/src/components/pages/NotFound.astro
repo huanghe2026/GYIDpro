@@ -1,0 +1,55 @@
+---
+/**
+ * 404 页面。
+ *
+ * 挂在注册表 slug `404` 上，因此会生成 `/404/index.html` 与 `/zh/404/index.html`；
+ * nginx 侧以 `error_page 404 /404/index.html;` 指向英文版。
+ *
+ * 单独存在是必要的：站点其余页面走 `try_files $uri $uri/ =404`，若 404 目标文件
+ * 缺失，nginx 会在内部重定向中形成环并最终返回 500 而不是 404。
+ */
+import { path, type Lang } from '../../i18n/ui';
+import Eyebrow from '../ui/Eyebrow.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const zh = lang === 'zh';
+
+const L = {
+  eyebrow: zh ? '错误 404' : 'Error 404',
+  title: zh ? '这个网格里没有东西' : 'Nothing in this cell',
+  lead: zh
+    ? '你要找的页面不存在，或已经被移动。协议只留下量化后的网格证据，没有留下这条路径的痕迹。'
+    : 'The page you are looking for does not exist or has moved. The protocol keeps only quantized cell evidence — no trace of this path remains.',
+  home: zh ? '返回首页' : 'Back to home',
+  console: zh ? '打开控制台' : 'Open the console',
+} as const;
+
+const homeHref = path(lang, '');
+const consoleHref = path(lang, 'console');
+---
+
+<div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
+  <Eyebrow>{L.eyebrow}</Eyebrow>
+  <h1 class="mt-4 max-w-3xl text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
+    {L.title}
+  </h1>
+  <p class="mt-5 max-w-2xl text-base leading-relaxed text-white/70">{L.lead}</p>
+  <div class="mt-8 flex flex-wrap gap-3">
+    <a
+      href={homeHref}
+      class="rounded-lg border border-cyber-blue/50 bg-cyber-blue/15 px-5 py-2.5 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/25"
+    >
+      {L.home}
+    </a>
+    <a
+      href={consoleHref}
+      class="rounded-lg border border-white/12 px-5 py-2.5 text-sm font-bold text-white/70 transition hover:border-cyber-blue/40 hover:text-cyber-blue"
+    >
+      {L.console}
+    </a>
+  </div>
+</div>

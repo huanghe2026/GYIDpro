@@ -1,0 +1,300 @@
+---
+import ConsoleShell from '../ConsoleShell.astro';
+import { ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const zh = lang === 'zh';
+
+const L = {
+  locate: zh ? '定位' : 'Location',
+  waiting: zh ? '等待 GPS 定位…（需浏览器定位权限）' : 'Waiting for GPS… (browser permission required)',
+  manual: zh ? '改用手动坐标' : 'Use manual coordinates',
+  useGps: zh ? '改回 GPS' : 'Back to GPS',
+  lat: zh ? '纬度' : 'Latitude',
+  lng: zh ? '经度' : 'Longitude',
+  params: zh ? '采集参数' : 'Parameters',
+  res: zh ? 'H3 分辨率（7..=10）' : 'H3 resolution (7..=10)',
+  cell: zh ? '当前 H3 cell（hex）' : 'Current H3 cell (hex)',
+  interval: zh ? '采集间隔 900s' : 'Collect interval 900 s',
+  exploration: zh ? '探索会话（允许 5–15 分钟）' : 'Exploration session (5–15 min allowed)',
+  auto: zh ? '自动采集' : 'Auto collect',
+  collect: zh ? '立即采集并签名' : 'Collect & sign now',
+  chain: zh ? '本地链' : 'Local chain',
+  local: zh ? '本地' : 'local',
+  uploaded: zh ? '已上传' : 'uploaded',
+  pending: zh ? '待同步' : 'pending',
+  uploadNow: zh ? '上传到验证方' : 'Upload to verifier',
+  selfCheck: zh ? '全链自检' : 'Chain self-check',
+  clear: zh ? '清空' : 'Clear',
+  log: zh ? '日志' : 'Log',
+  needIdentity: zh ? '请先在上方创建或解锁身份。' : 'Create or unlock an identity above first.',
+  needPos: zh ? '尚无定位，无法采集。' : 'No location yet — cannot collect.',
+} as const;
+---
+
+<ConsoleShell lang={lang} slug="console/collect" heading={t.console.tabs.collect}>
+  <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+    <div class="space-y-6">
+      <div class="cyber-border p-5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.locate}</h2>
+          <button id="gyid-toggle-manual" class="rounded-lg border border-white/12 px-3 py-1.5 text-xs font-bold text-white/70 hover:border-cyber-blue/40 hover:text-cyber-blue">
+            {L.manual}
+          </button>
+        </div>
+        <p id="gyid-geo-status" class="mt-3 text-sm text-white/55">{L.waiting}</p>
+        <div id="gyid-manual" class="mt-3 hidden grid-cols-2 gap-3">
+          <input id="gyid-lat" type="number" step="0.000001" placeholder={L.lat} />
+          <input id="gyid-lng" type="number" step="0.000001" placeholder={L.lng} />
+        </div>
+      </div>
+
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.params}</h2>
+        <div class="mt-4 space-y-4">
+          <div>
+            <label class="text-xs text-white/45" for="gyid-res">{L.res}</label>
+            <select id="gyid-res" class="mt-1 w-full">
+              <option value="7">res 7</option>
+              <option value="8">res 8</option>
+              <option value="9">res 9</option>
+              <option value="10" selected>res 10</option>
+            </select>
+          </div>
+          <div>
+            <div class="text-xs text-white/45">{L.cell}</div>
+            <code id="gyid-cell" class="mt-1 block font-mono text-sm text-cyber-cyan">—</code>
+          </div>
+          <label class="flex items-center gap-2 text-sm text-white/70">
+            <input id="gyid-exploration" type="checkbox" class="h-4 w-4" />
+            {L.exploration}
+          </label>
+          <label class="flex items-center gap-2 text-sm text-white/70">
+            <input id="gyid-auto" type="checkbox" class="h-4 w-4" />
+            {L.auto} <span class="font-mono text-xs text-white/35">(900s)</span>
+          </label>
+          <button id="gyid-collect" disabled class="w-full rounded-lg border border-cyber-blue/50 bg-cyber-blue/15 px-4 py-2.5 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/25 disabled:cursor-not-allowed disabled:opacity-40">
+            {L.collect}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.chain}</h2>
+        <div class="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div><div id="gyid-c-local" class="font-cyber text-2xl font-black text-white">0</div><div class="text-xs text-white/40">{L.local}</div></div>
+          <div><div id="gyid-c-up" class="font-cyber text-2xl font-black text-cyber-blue">0</div><div class="text-xs text-white/40">{L.uploaded}</div></div>
+          <div><div id="gyid-c-pending" class="font-cyber text-2xl font-black text-cyber-yellow">0</div><div class="text-xs text-white/40">{L.pending}</div></div>
+        </div>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <button id="gyid-upload" class="rounded-lg border border-cyber-blue/40 bg-cyber-blue/10 px-3.5 py-2 text-xs font-bold text-cyber-blue hover:bg-cyber-blue/20">{L.uploadNow}</button>
+          <button id="gyid-check" class="rounded-lg border border-white/12 px-3.5 py-2 text-xs font-bold text-white/70 hover:border-cyber-blue/40 hover:text-cyber-blue">{L.selfCheck}</button>
+          <button id="gyid-reset" class="rounded-lg border border-white/12 px-3.5 py-2 text-xs font-bold text-white/50 hover:border-cyber-red/40 hover:text-cyber-red">{L.clear}</button>
+        </div>
+      </div>
+
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.log}</h2>
+        <div id="gyid-log" class="mt-3 max-h-72 space-y-1 overflow-y-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { chainState, collectNext, loadChain, resetChain, uploadPending, verifyLocalChain } from '../../lib/chain';
+    import { currentSession, logLine, onSession } from '../../lib/console-ui';
+    import { loadWasm } from '../../lib/wasm';
+    import { uploadEvidence } from '../../lib/verifier';
+
+    function init(): void {
+      const bar = document.getElementById('gyid-identity-bar');
+      if (!bar) return;
+      const zh = (bar.getAttribute('data-lang') ?? 'en') === 'zh';
+      const S = {
+        needIdentity: zh ? '请先在上方创建或解锁身份。' : 'Create or unlock an identity above first.',
+        needPos: zh ? '尚无定位，无法采集。' : 'No location yet — cannot collect.',
+        signed: zh ? '已签名' : 'signed',
+        cellOf: zh ? '网格' : 'cell',
+        uploaded: zh ? '已上传' : 'uploaded',
+        checkOk: zh ? '全链自检通过' : 'chain self-check passed',
+        checkFail: zh ? '全链自检失败（见控制台）' : 'chain self-check FAILED (see console)',
+        cleared: zh ? '本地链已清空' : 'local chain cleared',
+        autoWait: zh ? '自动采集等待中（900s）' : 'auto-collect waiting (900s)',
+        gpsDenied: zh ? 'GPS 不可用，可改用手动坐标' : 'GPS unavailable — use manual coordinates',
+        manualOn: zh ? '已切换到手动坐标' : 'switched to manual coordinates',
+        gpsOn: zh ? '已切换回 GPS' : 'back to GPS',
+      };
+
+      let pos: { lat: number; lng: number } | null = null;
+      let manual = false;
+      let timer: number | null = null;
+      let watchId: number | null = null;
+
+      const $ = <T extends HTMLElement>(id: string): T | null => document.getElementById(id) as T | null;
+      const collectBtn = $<HTMLButtonElement>('gyid-collect');
+      const cellEl = $('gyid-cell');
+      const geoStatus = $('gyid-geo-status');
+
+      const refreshChain = (): void => {
+        const st = chainState();
+        const local = $('gyid-c-local');
+        const up = $('gyid-c-up');
+        const pend = $('gyid-c-pending');
+        if (local) local.textContent = String(st.crumbs.length);
+        if (up) up.textContent = String(st.uploadedCount);
+        if (pend) pend.textContent = String(Math.max(0, st.crumbs.length - st.uploadedCount));
+        const uploadBtn = $<HTMLButtonElement>('gyid-upload');
+        if (uploadBtn) uploadBtn.disabled = st.uploadedCount >= st.crumbs.length;
+      };
+
+      const updateCell = async (): Promise<void> => {
+        if (!cellEl) return;
+        if (!pos) {
+          cellEl.textContent = '—';
+          return;
+        }
+        try {
+          const wasm = await loadWasm();
+          const res = Number($<HTMLSelectElement>('gyid-res')?.value ?? '10');
+          cellEl.textContent = wasm.h3_to_cell_hex(pos.lat, pos.lng, res);
+        } catch {
+          cellEl.textContent = '—';
+        }
+      };
+
+      const setPosition = async (lat: number, lng: number, label: string): Promise<void> => {
+        pos = { lat, lng };
+        if (geoStatus) geoStatus.textContent = `● ${label}`;
+        await updateCell();
+        if (collectBtn) collectBtn.disabled = false;
+      };
+
+      const startWatch = (): void => {
+        if (!navigator.geolocation) {
+          if (geoStatus) geoStatus.textContent = S.gpsDenied;
+          return;
+        }
+        watchId = navigator.geolocation.watchPosition(
+          (p) => void setPosition(p.coords.latitude, p.coords.longitude, `GPS ${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`),
+          () => {
+            if (geoStatus && !manual) geoStatus.textContent = S.gpsDenied;
+          },
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+        );
+      };
+
+      const doCollect = async (): Promise<void> => {
+        const session = currentSession();
+        if (!session) return logLine('gyid-log', S.needIdentity, 'err');
+        if (!pos) return logLine('gyid-log', S.needPos, 'err');
+        try {
+          const crumb = await collectNext({
+            seedHex: session.seedHex,
+            lat: pos.lat,
+            lng: pos.lng,
+            resolution: Number($<HTMLSelectElement>('gyid-res')?.value ?? '10'),
+            exploration: $<HTMLInputElement>('gyid-exploration')?.checked ?? false,
+          });
+          logLine('gyid-log', `${S.signed} #${crumb.index} · ${S.cellOf} ${crumb.h3_cell_hex}`, 'ok');
+          refreshChain();
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      };
+
+      collectBtn?.addEventListener('click', () => void doCollect());
+
+      $('gyid-res')?.addEventListener('change', () => void updateCell());
+
+      $('gyid-toggle-manual')?.addEventListener('click', (ev) => {
+        manual = !manual;
+        const btn = ev.currentTarget as HTMLButtonElement;
+        $('gyid-manual')?.classList.toggle('hidden', !manual);
+        $('gyid-manual')?.classList.toggle('grid', manual);
+        btn.textContent = manual
+          ? (zh ? '改回 GPS' : 'Back to GPS')
+          : (zh ? '改用手动坐标' : 'Use manual coordinates');
+        if (manual) {
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+          const lat = Number($<HTMLInputElement>('gyid-lat')?.value);
+          const lng = Number($<HTMLInputElement>('gyid-lng')?.value);
+          if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) {
+            void setPosition(lat, lng, `manual ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+          }
+          logLine('gyid-log', S.manualOn);
+        } else {
+          logLine('gyid-log', S.gpsOn);
+          startWatch();
+        }
+      });
+
+      for (const id of ['gyid-lat', 'gyid-lng']) {
+        $(id)?.addEventListener('change', () => {
+          const lat = Number($<HTMLInputElement>('gyid-lat')?.value);
+          const lng = Number($<HTMLInputElement>('gyid-lng')?.value);
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            void setPosition(lat, lng, `manual ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+          }
+        });
+      }
+
+      $('gyid-auto')?.addEventListener('change', (ev) => {
+        const on = (ev.target as HTMLInputElement).checked;
+        if (timer !== null) {
+          clearInterval(timer);
+          timer = null;
+        }
+        if (on) {
+          logLine('gyid-log', S.autoWait);
+          timer = window.setInterval(() => void doCollect(), 900_000);
+        }
+      });
+
+      $('gyid-upload')?.addEventListener('click', async () => {
+        const session = currentSession();
+        if (!session) return logLine('gyid-log', S.needIdentity, 'err');
+        try {
+          const n = await uploadPending(async (cborHex) => uploadEvidence(cborHex));
+          logLine('gyid-log', `${S.uploaded} ${n}`, 'ok');
+          refreshChain();
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      });
+
+      $('gyid-check')?.addEventListener('click', async () => {
+        try {
+          const ok = await verifyLocalChain();
+          logLine('gyid-log', ok ? S.checkOk : S.checkFail, ok ? 'ok' : 'err');
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      });
+
+      $('gyid-reset')?.addEventListener('click', () => {
+        if (!confirm(zh ? '确认清空本地链？此操作不可撤销。' : 'Clear the local chain? This cannot be undone.')) return;
+        resetChain();
+        refreshChain();
+        logLine('gyid-log', S.cleared);
+      });
+
+      onSession((session) => {
+        if (session) loadChain(session.pubkeyHex);
+        refreshChain();
+        if (collectBtn) collectBtn.disabled = !session || !pos;
+      });
+
+      refreshChain();
+      startWatch();
+    }
+
+    document.addEventListener('astro:page-load', init);
+  </script>
+</ConsoleShell>

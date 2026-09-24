@@ -1,0 +1,243 @@
+---
+import { ui, path, SITE, type Lang } from '../../i18n/ui';
+import Eyebrow from '../ui/Eyebrow.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const h = t.home;
+
+/** 强调色 → 字面量类名（Tailwind 需在源码中看到完整类名才会生成） */
+const accent: Record<string, { text: string; ring: string; glow: string }> = {
+  emerald: {
+    text: 'text-cyber-blue',
+    ring: 'border-cyber-blue/30',
+    glow: 'shadow-[0_0_24px_rgba(16,185,129,0.18)]',
+  },
+  violet: {
+    text: 'text-cyber-purple',
+    ring: 'border-cyber-purple/30',
+    glow: 'shadow-[0_0_24px_rgba(139,92,246,0.18)]',
+  },
+  amber: {
+    text: 'text-cyber-yellow',
+    ring: 'border-cyber-yellow/30',
+    glow: 'shadow-[0_0_24px_rgba(251,191,36,0.16)]',
+  },
+  pink: {
+    text: 'text-cyber-pink',
+    ring: 'border-cyber-pink/30',
+    glow: 'shadow-[0_0_24px_rgba(244,114,182,0.16)]',
+  },
+};
+---
+
+<!-- ── Hero ──────────────────────────────────────────────────── -->
+<section class="cyber-grid-lines relative overflow-hidden border-b border-white/[0.06]">
+  <div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
+    <div class="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
+      <div>
+        <Eyebrow>{h.eyebrow}</Eyebrow>
+        <h1 class="mt-5 text-4xl font-black leading-[1.1] tracking-tight text-white sm:text-5xl">
+          {h.title}
+        </h1>
+        <p class="mt-4 font-cyber text-sm font-bold uppercase tracking-[0.2em] text-cyber-cyan">
+          {h.subtitle}
+        </p>
+        <p class="mt-6 max-w-xl text-base leading-relaxed text-white/70">{h.lead}</p>
+
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a
+            href={path(lang, 'console')}
+            class="rounded-xl border border-cyber-blue/50 bg-cyber-blue/15 px-5 py-3 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/25"
+            style="box-shadow: 0 0 0 1px rgba(52,211,153,0.15), 0 0 24px rgba(16,185,129,0.18);"
+          >
+            {h.ctaPrimary}
+          </a>
+          <a
+            href={path(lang, 'protocol')}
+            class="rounded-xl border border-white/12 px-5 py-3 text-sm font-bold text-white/80 transition hover:border-cyber-blue/40 hover:text-cyber-blue"
+          >
+            {h.ctaSecondary}
+          </a>
+        </div>
+
+        <ul class="mt-8 flex flex-wrap gap-x-5 gap-y-2">
+          {
+            h.badges.map((b) => (
+              <li class="flex items-center gap-2 text-xs text-white/55">
+                <span class="text-cyber-blue">✓</span>
+                {b}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <!-- 面包屑链示意 -->
+      <div class="cyber-border p-6">
+        <div class="flex items-center justify-between">
+          <span class="font-mono text-[11px] uppercase tracking-widest text-white/40">
+            breadcrumb chain
+          </span>
+          <span class="badge badge-ok">α ∈ [0.30, 0.80]</span>
+        </div>
+
+        <div class="mt-6 space-y-3 font-mono text-[11px]">
+          {
+            [
+              { i: '#0', cell: '8a31aa4282effff', note: 'genesis · prev=null' },
+              { i: '#1', cell: '8a31aa4282f3fff', note: 'Δ 15 min · signed' },
+              { i: '#2', cell: '8a31aa4282f7fff', note: 'Δ 15 min · signed' },
+              { i: '#3', cell: '8a31aa42867ffff', note: 'epoch seal → merkle' },
+            ].map((row, idx) => (
+              <div
+                class="crumb-flow flex items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5"
+                style={`animation-delay:${idx * 0.45}s`}
+              >
+                <span class="w-7 text-cyber-purple">{row.i}</span>
+                <span class="flex-1 text-cyber-cyan">{row.cell}</span>
+                <span class="hidden text-white/35 sm:block">{row.note}</span>
+              </div>
+            ))
+          }
+        </div>
+
+        <div class="mt-6 grid grid-cols-3 gap-3 border-t border-white/[0.06] pt-5 text-center">
+          <div>
+            <div class="font-cyber text-lg font-black text-cyber-blue">H3 r10</div>
+            <div class="mt-0.5 text-[11px] text-white/45">quantized on device</div>
+          </div>
+          <div>
+            <div class="font-cyber text-lg font-black text-cyber-purple">Ed25519</div>
+            <div class="mt-0.5 text-[11px] text-white/45">per breadcrumb</div>
+          </div>
+          <div>
+            <div class="font-cyber text-lg font-black text-cyber-yellow">SHA-256</div>
+            <div class="mt-0.5 text-[11px] text-white/45">block hash</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────── -->
+<section class="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+  <SectionHeading title={h.featuresTitle} lead={h.featuresLead} />
+  <div class="mt-10 grid gap-6 sm:grid-cols-2">
+    {
+      h.features.map((f) => (
+        <article
+          class:list={['cyber-border p-6 transition', accent[f.accent].ring, accent[f.accent].glow]}
+        >
+          <h3 class:list={['text-lg font-black', accent[f.accent].text]}>{f.title}</h3>
+          <p class="mt-3 text-sm leading-relaxed text-white/65">{f.body}</p>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<!-- ── How it works ──────────────────────────────────────────── -->
+<section class="border-y border-white/[0.06] bg-white/[0.015]">
+  <div class="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+    <SectionHeading title={h.flowTitle} lead={h.flowLead} />
+    <ol class="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {
+        h.steps.map((s) => (
+          <li class="cyber-border p-6">
+            <span class="font-cyber text-2xl font-black text-cyber-blue/40">{s.n}</span>
+            <h3 class="mt-3 text-base font-black text-white">{s.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-white/60">{s.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<!-- ── Engine ────────────────────────────────────────────────── -->
+<section class="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+  <SectionHeading title={h.engineTitle} lead={h.engineLead} />
+  <div class="mt-10 grid gap-6 md:grid-cols-2">
+    {
+      h.engine.map((e) => (
+        <article class="cyber-border p-6">
+          <h3 class="text-base font-black text-cyber-cyan">{e.title}</h3>
+          <p class="mt-2 text-sm leading-relaxed text-white/65">{e.body}</p>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<!-- ── Trust levels ──────────────────────────────────────────── -->
+<section class="border-y border-white/[0.06] bg-white/[0.015]">
+  <div class="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+    <SectionHeading title={h.trustTitle} lead={h.trustLead} />
+    <div class="cyber-border mt-10 overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.08]">
+            {
+              ['level', 'breadcrumbs', 'meaning'].map((c) => (
+                <th class="px-5 py-3 text-left font-mono text-[11px] uppercase tracking-widest text-cyber-blue">
+                  {c}
+                </th>
+              ))
+            }
+          </tr>
+        </thead>
+        <tbody>
+          {
+            h.trustRows.map((r) => (
+              <tr class="border-b border-white/[0.05] last:border-0">
+                <td class="px-5 py-3.5 font-bold text-white">{r[0]}</td>
+                <td class="whitespace-nowrap px-5 py-3.5 font-mono text-cyber-cyan">{r[1]}</td>
+                <td class="px-5 py-3.5 text-white/60">{r[2]}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── Repo ──────────────────────────────────────────────────── -->
+<section class="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+  <SectionHeading title={h.stackTitle} lead={h.stackLead} />
+  <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      h.stack.map((s) => (
+        <article class="cyber-border flex flex-col p-5">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="font-mono text-sm font-bold text-cyber-cyan">{s.title}</h3>
+            <span class="badge badge-mute shrink-0">{s.tag}</span>
+          </div>
+          <p class="mt-3 flex-1 text-sm leading-relaxed text-white/60">{s.body}</p>
+        </article>
+      ))
+    }
+  </div>
+
+  <div class="mt-10 flex flex-wrap items-center gap-4">
+    <a
+      href={path(lang, 'console')}
+      class="rounded-xl border border-cyber-blue/50 bg-cyber-blue/15 px-5 py-3 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/25"
+      >{h.ctaPrimary}</a
+    >
+    <a
+      href={SITE.github}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="font-mono text-sm text-white/55 underline transition hover:text-cyber-blue"
+      >{SITE.github}</a
+    >
+  </div>
+</section>

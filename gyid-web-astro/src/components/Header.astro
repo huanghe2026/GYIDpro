@@ -1,0 +1,72 @@
+---
+import { ui, navItems, path, altPath, SITE, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  slug: string;
+}
+
+const { lang, slug } = Astro.props;
+const t = ui[lang];
+const items = navItems(t);
+const home = path(lang, '');
+
+// 语言切换：把当前 slug 映射到另一种语言（先剥掉可能存在的 /zh 前缀）
+const bareSlug = slug;
+const other = altPath(lang, bareSlug);
+
+const isActive = (s: string) => (s === '' ? slug === '' : slug === s || slug.startsWith(`${s}/`));
+---
+
+<header class="sticky top-0 z-50 border-b border-white/[0.08] bg-[#020617]/85 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+    <a href={home} class="flex shrink-0 items-center gap-2" aria-label={t.nav.home}>
+      <span
+        class="grid h-8 w-8 place-items-center rounded-lg border border-cyber-blue/40 bg-cyber-blue/10 font-cyber text-sm font-black text-cyber-blue"
+        >G</span
+      >
+      <span class="font-cyber text-base font-black tracking-wide text-white">TRIP·GyID</span>
+    </a>
+
+    <nav class="nav-scroll ml-2 flex flex-1 items-center gap-1 overflow-x-auto">
+      {
+        items.map((item) => (
+          <a
+            href={path(lang, item.slug)}
+            class:list={[
+              'nav-link whitespace-nowrap px-3 py-1.5 text-sm',
+              isActive(item.slug) ? 'text-cyber-blue' : 'text-white/70 hover:text-white',
+            ]}
+            aria-current={isActive(item.slug) ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="flex shrink-0 items-center gap-2">
+      <a
+        href={path(lang, 'console')}
+        class="hidden rounded-lg border border-cyber-blue/50 bg-cyber-blue/10 px-3 py-1.5 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/20 sm:block"
+      >
+        {t.nav.console}
+      </a>
+      <a
+        href={other}
+        class="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-bold text-white/70 transition hover:border-cyber-blue/40 hover:text-cyber-blue"
+        aria-label="switch language"
+      >
+        {t.nav.langSwitch}
+      </a>
+      <a
+        href={SITE.github}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hidden rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-bold text-white/70 transition hover:border-cyber-blue/40 hover:text-cyber-blue md:block"
+      >
+        {t.nav.github}
+      </a>
+    </div>
+  </div>
+</header>

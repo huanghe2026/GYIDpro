@@ -1,0 +1,274 @@
+---
+import ConsoleShell from '../ConsoleShell.astro';
+import { ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const zh = lang === 'zh';
+
+const L = {
+  flow: zh ? '流程' : 'Flow',
+  steps: zh
+    ? ['连接验证方 WebSocket', '请求挑战（POST /v1/verify）', '接收 LivenessChallenge', '签名回送应答', '轮询取回 PoH 证书', '本地 verify_poh 校验']
+    : ['Connect to the verifier WebSocket', 'Request a challenge (POST /v1/verify)', 'Receive the LivenessChallenge', 'Sign and return the response', 'Poll for the PoH certificate', 'Verify it locally with verify_poh'],
+  start: zh ? '发起验证' : 'Start verification',
+  newNonce: zh ? '换 nonce' : 'New nonce',
+  challenge: zh ? '挑战' : 'Challenge',
+  challengeId: zh ? 'challenge_id' : 'challenge_id',
+  expires: zh ? '过期时间' : 'expires',
+  delivered: zh ? '推送' : 'delivery',
+  fields: zh ? 'LivenessChallenge 字段' : 'LivenessChallenge fields',
+  result: zh ? 'PoH 证书' : 'PoH certificate',
+  placeholder: zh ? '证书将在此展示' : 'The certificate will appear here',
+  log: zh ? '日志' : 'Log',
+  idle: zh ? '点击「发起验证」开始' : 'Press “Start verification” to begin',
+  needIdentity: zh ? '请先创建或解锁身份。' : 'Create or unlock an identity first.',
+  needsEvidence: zh
+    ? '该身份需先在 Collect/Import 页上传过面包屑，否则 POST /v1/verify 会返回 404。'
+    : 'This identity must have uploaded breadcrumbs first, otherwise POST /v1/verify returns 404.',
+  trust: zh ? '信任分' : 'trust score',
+  confidence: zh ? '置信度' : 'confidence',
+  indices: zh ? 'α / β / κ / π' : 'α / β / κ / π',
+  counts: zh ? '面包屑 / 唯一网格' : 'breadcrumbs / unique cells',
+  issued: zh ? '签发时间' : 'issued at',
+  validity: zh ? '有效期' : 'validity',
+  nonceChain: zh ? 'nonce / 链头' : 'nonce / chain head',
+  pending: zh ? '等待签发…' : 'waiting for issuance…',
+} as const;
+---
+
+<ConsoleShell lang={lang} slug="console/verify" heading={t.console.tabs.verify}>
+  <div class="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+    <div class="space-y-6">
+      <div class="cyber-border p-5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.flow}</h2>
+        </div>
+        <ol class="mt-4 space-y-2">
+          {
+            L.steps.map((s, i) => (
+              <li class="flex gap-3 text-sm text-white/60">
+                <span class="font-mono text-xs text-cyber-purple">{String(i + 1).padStart(2, '0')}</span>
+                <span>{s}</span>
+              </li>
+            ))
+          }
+        </ol>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <button id="gyid-start" class="rounded-lg border border-cyber-blue/50 bg-cyber-blue/15 px-4 py-2.5 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/25">{L.start}</button>
+          <button id="gyid-nonce" class="rounded-lg border border-white/12 px-3.5 py-2.5 text-xs font-bold text-white/70 hover:border-cyber-blue/40 hover:text-cyber-blue">{L.newNonce}</button>
+        </div>
+        <div class="mt-4">
+          <div class="text-xs text-white/40">rp_nonce</div>
+          <code id="gyid-nonce-val" class="mt-1 block break-all font-mono text-[11px] text-cyber-cyan">—</code>
+        </div>
+        <p class="mt-4 text-xs leading-relaxed text-white/40">{L.needsEvidence}</p>
+      </div>
+
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.log}</h2>
+        <div id="gyid-log" class="mt-3 max-h-72 space-y-1 overflow-y-auto">
+          <p class="font-mono text-xs text-white/40">{L.idle}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <div id="gyid-challenge-card" class="cyber-border hidden p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.challenge}</h2>
+        <div class="mt-3 space-y-2 text-sm">
+          <div><span class="text-white/40">{L.challengeId}: </span><code id="gyid-ch-id" class="font-mono text-xs text-cyber-cyan"></code></div>
+          <div><span class="text-white/40">{L.expires}: </span><span id="gyid-ch-exp" class="font-mono text-xs text-white/70"></span></div>
+          <div><span class="text-white/40">{L.delivered}: </span><span id="gyid-ch-deliv" class="font-mono text-xs"></span></div>
+        </div>
+        <div class="mt-4 border-t border-white/[0.06] pt-4">
+          <h3 class="text-xs font-bold uppercase tracking-widest text-cyber-blue">{L.fields}</h3>
+          <div class="mt-2 space-y-1 font-mono text-[11px] text-white/60">
+            <div>rp_nonce: <span id="gyid-ch-nonce" class="text-cyber-cyan"></span></div>
+            <div>chain_head: <span id="gyid-ch-head" class="text-cyber-cyan"></span></div>
+            <div>expected_index: <span id="gyid-ch-idx" class="text-cyber-cyan"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.result}</h2>
+        <div id="gyid-poh" class="mt-4 text-sm text-white/45">{L.placeholder}</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { currentSession, logLine, onSession } from '../../lib/console-ui';
+    import { loadChain } from '../../lib/chain';
+    import { loadWasm } from '../../lib/wasm';
+    import { fetchPoh, fetchWellKnown, openChallengeChannel, randomNonceHex, requestChallenge } from '../../lib/verifier';
+
+    const short = (h: string): string => (h.length > 24 ? `${h.slice(0, 12)}…${h.slice(-8)}` : h);
+
+    function init(): void {
+      const bar = document.getElementById('gyid-identity-bar');
+      if (!bar) return;
+      const zh = (bar.getAttribute('data-lang') ?? 'en') === 'zh';
+      const $ = <T extends HTMLElement>(id: string): T | null => document.getElementById(id) as T | null;
+
+      let nonce = randomNonceHex();
+      let channel: { close: () => void } | null = null;
+      const nonceEl = $('gyid-nonce-val');
+      const renderNonce = (): void => {
+        if (nonceEl) nonceEl.textContent = nonce;
+      };
+      renderNonce();
+
+      $('gyid-nonce')?.addEventListener('click', () => {
+        nonce = randomNonceHex();
+        renderNonce();
+      });
+
+      const showPoh = (info: {
+        identity_hex: string;
+        issued_at: number;
+        epoch_count: number;
+        alpha: number;
+        beta: number;
+        kappa: number;
+        pi: number;
+        criticality_confidence: number;
+        trust: number;
+        unique_cells: number;
+        breadcrumb_count: number;
+        validity_secs: number;
+        nonce_hex: string;
+        chain_head_hex: string;
+        verifier_signature_hex: string;
+        fresh: boolean;
+        policy_pass: boolean;
+        is_trusted: boolean;
+      }): void => {
+        const host = $('gyid-poh');
+        if (!host) return;
+        const ok = info.is_trusted;
+        host.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="badge ${ok ? 'badge-ok' : 'badge-err'}">${ok ? 'ACCEPTED' : 'REJECTED'}</span>
+            <span class="font-mono text-xs text-white/50">fresh: ${info.fresh} ｜ policy_pass: ${info.policy_pass}</span>
+          </div>
+          <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div><dt class="text-xs text-white/40">${zh ? '信任分' : 'trust'}</dt><dd class="font-mono text-cyber-blue">${info.trust.toFixed(2)}</dd></div>
+            <div><dt class="text-xs text-white/40">${zh ? '置信度' : 'confidence'}</dt><dd class="font-mono text-cyber-blue">${info.criticality_confidence.toFixed(4)}</dd></div>
+            <div><dt class="text-xs text-white/40">α / β / κ / π</dt><dd class="font-mono text-white/70">${info.alpha.toFixed(3)} / ${info.beta.toFixed(3)} / ${info.kappa.toFixed(3)} / ${info.pi.toFixed(3)}</dd></div>
+            <div><dt class="text-xs text-white/40">${zh ? '面包屑 / 唯一网格' : 'breadcrumbs / unique'}</dt><dd class="font-mono text-white/70">${info.breadcrumb_count} / ${info.unique_cells}</dd></div>
+            <div><dt class="text-xs text-white/40">${zh ? '签发时间' : 'issued at'}</dt><dd class="font-mono text-white/70">${new Date(info.issued_at * 1000).toLocaleString()}</dd></div>
+            <div><dt class="text-xs text-white/40">${zh ? '有效期' : 'validity'}</dt><dd class="font-mono text-white/70">${info.validity_secs}s</dd></div>
+          </dl>
+          <div class="mt-3 space-y-1 font-mono text-[11px] text-white/45">
+            <div>nonce: ${info.nonce_hex}</div>
+            <div>chain_head: ${info.chain_head_hex}</div>
+            <div>verifier_sig: ${short(info.verifier_signature_hex)}</div>
+          </div>
+        `;
+      };
+
+      $('gyid-start')?.addEventListener('click', async () => {
+        const session = currentSession();
+        if (!session) return logLine('gyid-log', zh ? '请先创建或解锁身份。' : 'Create or unlock an identity first.', 'err');
+
+        const btn = $<HTMLButtonElement>('gyid-start');
+        if (btn) btn.disabled = true;
+        channel?.close();
+
+        try {
+          const wasm = await loadWasm();
+          const wk = await fetchWellKnown();
+          logLine('gyid-log', `verifier ${wk.verifier} · ${short(wk.verifier_pubkey)}`);
+
+          // 1) 打开实时通道并应答挑战
+          logLine('gyid-log', zh ? '连接验证方 WS…' : 'connecting to verifier WS…');
+          channel = openChallengeChannel(
+            session.pubkeyHex,
+            (challengeCborHex) => wasm.sign_liveness_response(session.seedHex, challengeCborHex),
+            (kind, detail) => {
+              if (kind === 'ready') logLine('gyid-log', 'WS ready', 'ok');
+              else if (kind === 'challenge') {
+                const ch = wasm.parse_liveness_challenge(detail as string);
+                logLine('gyid-log', `challenge expected_index=${ch.expected_index}`, 'ok');
+                const card = $('gyid-challenge-card');
+                card?.classList.remove('hidden');
+                const set = (id: string, v: string): void => {
+                  const el = $(id);
+                  if (el) el.textContent = v;
+                };
+                set('gyid-ch-nonce', ch.rp_nonce_hex);
+                set('gyid-ch-head', ch.chain_head_hex);
+                set('gyid-ch-idx', String(ch.expected_index));
+              } else if (kind === 'sent') logLine('gyid-log', zh ? '已回送应答' : 'response sent', 'ok');
+              else if (kind === 'ack') logLine('gyid-log', `verifier: ${JSON.stringify(detail)}`, 'ok');
+              else if (kind === 'error') logLine('gyid-log', `error: ${JSON.stringify(detail)}`, 'err');
+              else if (kind === 'closed') logLine('gyid-log', 'WS closed');
+            },
+          );
+
+          // 2) 请求挑战
+          logLine('gyid-log', `POST /v1/verify (nonce=${short(nonce)})`);
+          const ch = await requestChallenge(session.pubkeyHex, nonce);
+          const card = $('gyid-challenge-card');
+          card?.classList.remove('hidden');
+          const set = (id: string, v: string): void => {
+            const el = $(id);
+            if (el) el.textContent = v;
+          };
+          set('gyid-ch-id', ch.challenge_id);
+          set('gyid-ch-exp', new Date(ch.expires_at * 1000).toLocaleTimeString());
+          set('gyid-ch-deliv', ch.delivered ? (zh ? '已送达 WS' : 'delivered over WS') : zh ? '未送达' : 'not delivered');
+          logLine('gyid-log', `challenge ${ch.challenge_id.slice(0, 12)}…`, 'ok');
+          if (!ch.delivered) logLine('gyid-log', zh ? '挑战未推送到 WS' : 'challenge was not pushed to WS', 'err');
+
+          // 3) 轮询取回 PoH
+          logLine('gyid-log', zh ? '等待签发…' : 'waiting for issuance…');
+          const deadline = Date.now() + 120_000;
+          let bytes: Uint8Array | null = null;
+          while (Date.now() < deadline) {
+            const r = await fetchPoh(ch.challenge_id);
+            if (r.kind === 'issued') {
+              bytes = r.bytes;
+              break;
+            }
+            await new Promise((res) => setTimeout(res, 1200));
+          }
+          if (!bytes) throw new Error(zh ? '轮询超时，未取回 PoH' : 'timed out waiting for the PoH');
+
+          const pohHex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+          logLine('gyid-log', `PoH ${bytes.length} bytes`, 'ok');
+
+          // 4) 本地校验
+          const info = wasm.verify_poh(
+            pohHex,
+            wk.verifier_pubkey,
+            nonce,
+            BigInt(Math.floor(Date.now() / 1000)),
+            wk.policy.min_confidence,
+            wk.policy.min_trust,
+          );
+          showPoh(info);
+          logLine('gyid-log', info.is_trusted ? (zh ? '校验通过' : 'verified') : zh ? '未通过策略门' : 'did not pass the policy gate', info.is_trusted ? 'ok' : 'err');
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+
+      onSession((session) => {
+        if (session) loadChain(session.pubkeyHex);
+      });
+
+      window.addEventListener('astro:before-swap', () => channel?.close(), { once: true });
+    }
+
+    document.addEventListener('astro:page-load', init);
+  </script>
+</ConsoleShell>

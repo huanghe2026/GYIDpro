@@ -1,0 +1,86 @@
+---
+import { ui, type Lang } from '../../i18n/ui';
+import Eyebrow from '../ui/Eyebrow.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const a = t.architecture;
+
+const methodClass: Record<string, string> = {
+  GET: 'text-cyber-blue border-cyber-blue/35 bg-cyber-blue/10',
+  POST: 'text-cyber-yellow border-cyber-yellow/35 bg-cyber-yellow/10',
+  WS: 'text-cyber-purple border-cyber-purple/35 bg-cyber-purple/10',
+};
+---
+
+<div class="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+  <Eyebrow>{a.eyebrow}</Eyebrow>
+  <h1 class="mt-4 max-w-3xl text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
+    {a.title}
+  </h1>
+  <p class="mt-5 max-w-3xl text-base leading-relaxed text-white/70">{a.lead}</p>
+</div>
+
+<section class="mx-auto max-w-6xl px-4 pb-12">
+  <SectionHeading title={a.layersTitle} />
+  <div class="mt-8 grid gap-5 md:grid-cols-2">
+    {
+      a.layers.map((l) => (
+        <article class="cyber-border p-6">
+          <h3 class="font-cyber text-base font-black text-cyber-blue">{l.name}</h3>
+          <p class="mt-1.5 text-xs text-white/45">{l.role}</p>
+          <ul class="mt-4 space-y-2">
+            {l.items.map((it) => (
+              <li class="flex gap-2 text-sm leading-relaxed text-white/65">
+                <span class="mt-[3px] shrink-0 text-cyber-purple">▸</span>
+                <span>{it}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<section class="border-y border-white/[0.06] bg-white/[0.015]">
+  <div class="mx-auto max-w-6xl px-4 py-14">
+    <SectionHeading title={a.repoTitle} />
+    <div class="cyber-border mt-8 overflow-x-auto">
+      <table class="w-full text-sm">
+        <tbody>
+          {
+            a.repo.map((r) => (
+              <tr class="border-b border-white/[0.05] last:border-0">
+                <td class="whitespace-nowrap px-5 py-3 font-mono text-[13px] font-bold text-cyber-cyan">
+                  {r.crate}
+                </td>
+                <td class="px-5 py-3 text-white/60">{r.role}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="mx-auto max-w-6xl px-4 py-14">
+  <SectionHeading title={a.endpointsTitle} />
+  <div class="cyber-border mt-8 divide-y divide-white/[0.05]">
+    {
+      a.endpoints.map((e) => (
+        <div class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:gap-5">
+          <span class:list={['badge w-fit shrink-0', methodClass[e.method]]}>{e.method}</span>
+          <code class="shrink-0 font-mono text-[13px] text-white/90">{e.path}</code>
+          <span class="text-sm text-white/50">{e.desc}</span>
+        </div>
+      ))
+    }
+  </div>
+</section>

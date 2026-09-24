@@ -1,0 +1,423 @@
+/* GyID 官网全局样式 —— 设计令牌与 diliy.cn 保持一致 */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 正文字体栈按语言切换（由 Layout.astro 写入 html[data-locale]） */
+:root {
+  --font-sans: 'Inter Variable', 'Poppins', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei', sans-serif;
+  --font-cyber: 'Orbitron', var(--font-sans);
+  --font-mono: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+}
+
+html[data-locale='zh'] {
+  --font-sans: 'Noto Sans SC Variable', 'Poppins', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei', sans-serif;
+}
+
+:root {
+  /* 全站统一配色：翡翠绿主强调 + 紫罗兰/粉/琥珀点缀 */
+  --cyber-blue: #34d399;
+  --cyber-pink: #f472b6;
+  --cyber-purple: #8b5cf6;
+  --cyber-green: #10b981;
+  --cyber-red: #fb7185;
+
+  /* 卡片网格统一间距（= gap-6 = 1.5rem） */
+  --card-grid-gap: 1.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #020617;
+  /* 深蓝黑基底 + 翡翠绿/紫罗兰柔和微光，制造纵深 */
+  background-image:
+    radial-gradient(70rem 50rem at 14% -12%, rgba(16, 185, 129, 0.07), transparent 55%),
+    radial-gradient(62rem 46rem at 96% -6%, rgba(124, 58, 237, 0.06), transparent 55%),
+    radial-gradient(84rem 60rem at 50% 112%, rgba(14, 165, 233, 0.05), transparent 60%);
+  background-attachment: fixed;
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.28);
+  color: #ffffff;
+  text-shadow: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cyber-blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.45);
+}
+
+a,
+button {
+  transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease,
+    transform 0.18s ease, opacity 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── 背景网格 ───────────────────────────────────────────────── */
+.cyber-grid {
+  background-color: #020617;
+}
+
+.cyber-grid-lines {
+  background-image:
+    linear-gradient(rgba(139, 92, 246, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.06) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* ── 玻璃面板（首页同款） ───────────────────────────────────── */
+.cyber-border {
+  background-color: #060c1a; /* gy-panel */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.04);
+  position: relative;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.neon-text {
+  color: #34d399;
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.15);
+}
+
+.geo-glow-pop {
+  box-shadow:
+    0 0 0 1px rgba(52, 211, 153, 0.15),
+    0 0 24px rgba(16, 185, 129, 0.18),
+    0 0 60px rgba(16, 185, 129, 0.08);
+}
+
+/* ── 顶部导航 ──────────────────────────────────────────────── */
+.nav-link {
+  position: relative;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 0.5rem;
+  transition: transform 0.15s ease, text-shadow 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.nav-link:hover {
+  transform: translateY(-1px) scale(1.04);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.nav-link:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.nav-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-link {
+    transition: none;
+  }
+  .nav-link:hover {
+    transform: none;
+  }
+}
+
+/* ── 滚动条 ────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cyber-blue), var(--cyber-purple));
+  border-radius: 6px;
+  border: 2px solid #020617;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--cyber-green), var(--cyber-blue));
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyber-blue) #020617;
+}
+
+/* ── 表单控件 · 统一赛博质感 ───────────────────────────────── */
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='search'],
+input[type='url'],
+input[type='number'],
+input[type='tel'],
+input[type='date'],
+textarea,
+select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--cyber-blue);
+  background: rgba(52, 211, 153, 0.06);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15), 0 0 12px rgba(16, 185, 129, 0.22);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 地图光点脉冲（4 色） ──────────────────────────────────── */
+@keyframes pulseRingEmerald {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55), 0 0 6px rgba(52, 211, 153, 0.9);
+  }
+  65% {
+    box-shadow: 0 0 0 11px rgba(52, 211, 153, 0), 0 0 14px rgba(52, 211, 153, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0), 0 0 6px rgba(52, 211, 153, 0.9);
+  }
+}
+
+@keyframes dotBreath {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+}
+
+.animate-pulse-emerald {
+  animation: pulseRingEmerald 2.4s ease-out infinite, dotBreath 1.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-emerald {
+    animation: none;
+  }
+}
+
+/* ── 面包屑链流动画（首页示意图） ──────────────────────────── */
+@keyframes crumbFlow {
+  0% {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  15%,
+  85% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+}
+
+.crumb-flow {
+  animation: crumbFlow 2.4s ease-in-out infinite;
+}
+
+/* ── 控制台状态徽章 ────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.badge-ok {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.badge-warn {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.badge-err {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(251, 113, 133, 0.35);
+}
+
+.badge-mute {
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── 文档正文排版 ──────────────────────────────────────────── */
+.prose-gyid {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.prose-gyid h2 {
+  margin: 2.25rem 0 0.9rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.prose-gyid h3 {
+  margin: 1.75rem 0 0.6rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.prose-gyid p {
+  margin: 0.85rem 0;
+}
+
+.prose-gyid ul,
+.prose-gyid ol {
+  margin: 0.85rem 0;
+  padding-left: 1.35rem;
+}
+
+.prose-gyid li {
+  margin: 0.35rem 0;
+}
+
+.prose-gyid a {
+  color: #34d399;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prose-gyid a:hover {
+  color: #6ee7b7;
+}
+
+.prose-gyid code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.12rem 0.35rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.07);
+  color: #a7f3d0;
+}
+
+.prose-gyid pre {
+  margin: 1.1rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 0.85rem;
+  background: #060c1a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.prose-gyid pre code {
+  background: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.prose-gyid table {
+  width: 100%;
+  margin: 1.1rem 0;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.prose-gyid th,
+.prose-gyid td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose-gyid th {
+  color: #6ee7b7;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.prose-gyid blockquote {
+  margin: 1.1rem 0;
+  padding: 0.35rem 0 0.35rem 1rem;
+  border-left: 3px solid rgba(52, 211, 153, 0.5);
+  color: rgba(255, 255, 255, 0.7);
+}

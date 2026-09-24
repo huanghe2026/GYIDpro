@@ -1,0 +1,236 @@
+---
+import ConsoleShell from '../ConsoleShell.astro';
+import { ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const zh = lang === 'zh';
+
+const L = {
+  step1: zh ? '1. 选择轨迹文件' : '1. Choose a track file',
+  gpx: zh ? 'GPX（含 <trkpt> / <rtept> / <wpt>）' : 'GPX (with <trkpt> / <rtept> / <wpt>)',
+  step2: zh ? '2. 参数' : '2. Parameters',
+  res: zh ? 'H3 分辨率（7..=10）' : 'H3 resolution (7..=10)',
+  fallback: zh ? '缺时间点的合成间隔（秒，≥300）' : 'Synthetic interval when time is missing (s, ≥300)',
+  exploration: zh ? '探索会话（允许 5–15 分钟间隔，§4.2）' : 'Exploration session (5–15 min interval, §4.2)',
+  timeNote: zh
+    ? 'GPX 的 <time> 建议为 UTC（ISO 8601）。导入的时间戳不会被改写；不满足链规则的点会被丢弃。'
+    : 'GPX <time> should be UTC (ISO 8601). Imported timestamps are never rewritten; points violating chain rules are dropped.',
+  step3: zh ? '3. 预演（链规则过滤）' : '3. Preview (chain-rule filtering)',
+  candidates: zh ? '候选点' : 'candidates',
+  accept: zh ? '将接受' : 'will accept',
+  drop: zh ? '将丢弃' : 'will drop',
+  reasons: zh ? '丢弃原因分布' : 'Drop reasons',
+  importBtn: zh ? '导入并追加到本地链' : 'Import and append to local chain',
+  step4: zh ? '4. 同步' : '4. Sync',
+  upload: zh ? '上传到验证方' : 'Upload to verifier',
+  selfCheck: zh ? '全链自检' : 'Chain self-check',
+  log: zh ? '日志' : 'Log',
+  noFile: zh ? '尚未选择文件' : 'No file selected',
+  pickFirst: zh ? '请先选择 GPX 文件' : 'Pick a GPX file first',
+  previewing: zh ? '预演中…' : 'Previewing…',
+} as const;
+---
+
+<ConsoleShell lang={lang} slug="console/import" heading={t.console.tabs.import}>
+  <div class="grid gap-6 lg:grid-cols-[1fr_1fr]">
+    <div class="space-y-6">
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.step1}</h2>
+        <label class="mt-4 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-white/15 px-4 py-6 transition hover:border-cyber-blue/40">
+          <input id="gyid-gpx" type="file" accept=".gpx,application/gpx+xml,text/xml" class="hidden" />
+          <span class="text-cyber-blue">↑</span>
+          <span id="gyid-file-name" class="text-sm text-white/60">{L.gpx}</span>
+        </label>
+
+        <h2 class="mt-6 text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.step2}</h2>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="text-xs text-white/45" for="gyid-res">{L.res}</label>
+            <select id="gyid-res" class="mt-1 w-full">
+              <option value="7">res 7</option><option value="8">res 8</option>
+              <option value="9">res 9</option><option value="10" selected>res 10</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-white/45" for="gyid-fallback">{L.fallback}</label>
+            <input id="gyid-fallback" type="number" min="300" step="60" value="900" class="mt-1 w-full" />
+          </div>
+        </div>
+        <label class="mt-4 flex items-center gap-2 text-sm text-white/70">
+          <input id="gyid-exploration" type="checkbox" class="h-4 w-4" />
+          {L.exploration}
+        </label>
+        <p class="mt-4 text-xs leading-relaxed text-white/40">{L.timeNote}</p>
+      </div>
+
+      <div class="cyber-border p-5">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.step4}</h2>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button id="gyid-upload" disabled class="rounded-lg border border-cyber-blue/40 bg-cyber-blue/10 px-3.5 py-2 text-xs font-bold text-cyber-blue hover:bg-cyber-blue/20 disabled:opacity-40">{L.upload}</button>
+          <button id="gyid-check" class="rounded-lg border border-white/12 px-3.5 py-2 text-xs font-bold text-white/70 hover:border-cyber-blue/40 hover:text-cyber-blue">{L.selfCheck}</button>
+        </div>
+        <div id="gyid-log" class="mt-4 max-h-56 space-y-1 overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <div class="cyber-border p-5">
+      <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.step3}</h2>
+      <div class="mt-4 grid grid-cols-3 gap-3 text-center">
+        <div><div id="gyid-p-total" class="font-cyber text-2xl font-black text-white">0</div><div class="text-xs text-white/40">{L.candidates}</div></div>
+        <div><div id="gyid-p-accept" class="font-cyber text-2xl font-black text-cyber-blue">0</div><div class="text-xs text-white/40">{L.accept}</div></div>
+        <div><div id="gyid-p-drop" class="font-cyber text-2xl font-black text-cyber-yellow">0</div><div class="text-xs text-white/40">{L.drop}</div></div>
+      </div>
+      <div class="mt-5">
+        <div class="text-xs text-white/45">{L.reasons}</div>
+        <div id="gyid-reasons" class="mt-2 space-y-1 text-xs text-white/60">—</div>
+      </div>
+      <button id="gyid-import" disabled class="mt-6 w-full rounded-lg border border-cyber-blue/50 bg-cyber-blue/15 px-4 py-2.5 text-sm font-bold text-cyber-blue transition hover:bg-cyber-blue/25 disabled:cursor-not-allowed disabled:opacity-40">
+        {L.importBtn}
+      </button>
+    </div>
+  </div>
+
+  <script>
+    import { importCrumbs, loadChain, previewImport, uploadPending, verifyLocalChain, type ImportSkip } from '../../lib/chain';
+    import { currentSession, logLine, onSession } from '../../lib/console-ui';
+    import { parseGpx, type TrackPoint } from '../../lib/gpx';
+    import { uploadEvidence } from '../../lib/verifier';
+
+    const REASON: Record<string, { en: string; zh: string }> = {
+      'same-cell': { en: 'same H3 cell as previous (§4.1)', zh: '与上一条落在同一 H3 网格（§4.1 连续去重）' },
+      'cell-cap': { en: 'cell already holds 10 breadcrumbs', zh: '该网格累计已达上限 10 条' },
+      'too-soon': { en: 'interval below the chain minimum', zh: '与上一条间隔不足' },
+      'time-backwards': { en: 'earlier than the current chain tail', zh: '早于链尾时间' },
+    };
+
+    function init(): void {
+      const bar = document.getElementById('gyid-identity-bar');
+      if (!bar) return;
+      const zh = (bar.getAttribute('data-lang') ?? 'en') === 'zh';
+      const $ = <T extends HTMLElement>(id: string): T | null => document.getElementById(id) as T | null;
+
+      let points: TrackPoint[] = [];
+
+      const setStats = (total: number, acc: number, skipped: ImportSkip[]): void => {
+        const t = $('gyid-p-total');
+        const a = $('gyid-p-accept');
+        const d = $('gyid-p-drop');
+        if (t) t.textContent = String(total);
+        if (a) a.textContent = String(acc);
+        if (d) d.textContent = String(skipped.length);
+
+        const counts = new Map<string, number>();
+        for (const s of skipped) counts.set(s.reason, (counts.get(s.reason) ?? 0) + 1);
+        const host = $('gyid-reasons');
+        if (host) {
+          host.innerHTML =
+            counts.size === 0
+              ? `<span class="text-cyber-blue">${zh ? '全部通过链规则' : 'all points pass the chain rules'}</span>`
+              : [...counts.entries()]
+                  .map(([r, n]) => `<div>${n} × ${zh ? REASON[r]?.zh ?? r : REASON[r]?.en ?? r}</div>`)
+                  .join('');
+        }
+        const importBtn = $<HTMLButtonElement>('gyid-import');
+        if (importBtn) importBtn.disabled = acc === 0;
+        const uploadBtn = $<HTMLButtonElement>('gyid-upload');
+        if (uploadBtn) uploadBtn.disabled = false;
+      };
+
+      const doPreview = async (): Promise<void> => {
+        if (points.length === 0) return;
+        try {
+          logLine('gyid-log', zh ? '预演中…' : 'previewing…');
+          const p = await previewImport({
+            points,
+            resolution: Number($<HTMLSelectElement>('gyid-res')?.value ?? '10'),
+            exploration: $<HTMLInputElement>('gyid-exploration')?.checked ?? false,
+          });
+          setStats(p.total, p.accepted, p.skipped);
+          logLine('gyid-log', `${p.accepted}/${p.total} ${zh ? '将接受' : 'will accept'}`, 'ok');
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      };
+
+      $('gyid-gpx')?.addEventListener('change', async (ev) => {
+        const file = (ev.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        const nameEl = $('gyid-file-name');
+        if (nameEl) nameEl.textContent = file.name;
+        try {
+          const xml = await file.text();
+          points = parseGpx(xml, {
+            fallbackIntervalSecs: Number($<HTMLInputElement>('gyid-fallback')?.value ?? '900'),
+          });
+          logLine('gyid-log', `${file.name}: ${points.length} ${zh ? '个点' : 'points'}`, 'ok');
+          await doPreview();
+        } catch (e) {
+          points = [];
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      });
+
+      $('gyid-res')?.addEventListener('change', () => void doPreview());
+      $('gyid-exploration')?.addEventListener('change', () => void doPreview());
+      $('gyid-fallback')?.addEventListener('change', () => void doPreview());
+
+      $('gyid-import')?.addEventListener('click', async () => {
+        const session = currentSession();
+        if (!session) return logLine('gyid-log', zh ? '请先创建或解锁身份。' : 'Create or unlock an identity first.', 'err');
+        if (points.length === 0) return logLine('gyid-log', zh ? '请先选择 GPX 文件' : 'Pick a GPX file first', 'err');
+        try {
+          const res = await importCrumbs({
+            seedHex: session.seedHex,
+            points,
+            resolution: Number($<HTMLSelectElement>('gyid-res')?.value ?? '10'),
+            exploration: $<HTMLInputElement>('gyid-exploration')?.checked ?? false,
+          });
+          setStats(points.length, res.added, res.skipped);
+          logLine('gyid-log', `${zh ? '已导入' : 'imported'} ${res.added}`, 'ok');
+          points = [];
+          const input = $<HTMLInputElement>('gyid-gpx');
+          if (input) input.value = '';
+          const nameEl = $('gyid-file-name');
+          if (nameEl) nameEl.textContent = zh ? '尚未选择文件' : 'No file selected';
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      });
+
+      $('gyid-upload')?.addEventListener('click', async () => {
+        const session = currentSession();
+        if (!session) return logLine('gyid-log', zh ? '请先创建或解锁身份。' : 'Create or unlock an identity first.', 'err');
+        try {
+          const n = await uploadPending(async (cborHex) => uploadEvidence(cborHex));
+          logLine('gyid-log', `${zh ? '已上传' : 'uploaded'} ${n}`, 'ok');
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      });
+
+      $('gyid-check')?.addEventListener('click', async () => {
+        try {
+          const ok = await verifyLocalChain();
+          logLine(
+            'gyid-log',
+            ok ? (zh ? '全链自检通过' : 'chain self-check passed') : zh ? '全链自检失败（见控制台）' : 'chain self-check FAILED (see console)',
+            ok ? 'ok' : 'err',
+          );
+        } catch (e) {
+          logLine('gyid-log', e instanceof Error ? e.message : String(e), 'err');
+        }
+      });
+
+      onSession((session) => {
+        if (session) loadChain(session.pubkeyHex);
+      });
+    }
+
+    document.addEventListener('astro:page-load', init);
+  </script>
+</ConsoleShell>

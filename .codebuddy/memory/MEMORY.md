@@ -41,3 +41,18 @@
 - **lean-ctx 已于 2026-09-25 完全卸载**（`cargo uninstall` + 删二进制/数据目录 + 从 `~/.codebuddy/mcp.json` 移除）。**不要再用任何 `ctx_*` 工具**，改用原生 `read_file`/`search_content`/`execute_command`。
 - `playwright-cli` 需 `--browser=chromium`（默认 chrome channel 在 `/opt/google/chrome` 不存在）；其 `snapshot --filename` 相对 CWD，需写 `.playwright-cli/...` 全路径。
 - git 工作区在 2026-09-25 已整理干净（5 个规范提交）；`.codebuddy/memory/*.md` 是**有意入库**的，不要 ignore 或删除。
+
+## 生产部署（2026-09-25 上线）
+- **唯一目标域名**：`gyid.geoyuan.com`。用户明确要求**不向 `diliy.cn` 部署任何东西**，也不要改其他站点配置。
+- **服务器**：`ssh server`（`8.136.127.182`，root，`~/.ssh/id_ed25519`），Ubuntu 24.04 / glibc 2.39。
+  - 本机 glibc 2.43 > 服务器 → **必须静态链接**：`RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target x86_64-unknown-linux-gnu`
+- **站点布局**（`/var/www/html/gyid.geoyuan.com/`）：Astro 站占根 + `/verify/` 是其子目录副本。
+  - 一套源码出两个变体：`BASE_PATH`/`OUT_DIR` 环境变量控制（`dist` / `dist-verify`，见 `.gitignore`）。
+- **trip-server**：systemd `trip-server.service`（User=www-data，`RuntimeDirectory=trip-server`），env `/etc/trip-server.env`。
+  - 监听 **Unix socket** `unix:/run/trip-server/verifier.sock`，**零 TCP 端口**（`ListenTarget` 见 `trip-server/src/listen.rs`）。
+  - axum 0.7 的 `axum::serve` 只吃 `TcpListener` → Unix 一路手动驱动 hyper 1.x，且**必须 `.with_upgrades()`** 否则 WS 101 失败。
+- **8080 属于 AnimeGAN**（`geoyuan.com` 与 `diliy.cn` 的 `/animegan/` 都反代它）；trip-server **不要**占 8080。
+- **nginx 两个必踩的坑**：
+  1. `gyid.geoyuan.com.conf` 的 `location ~ /\.` 会拦掉 `/.well-known/*` → 放通必须用 `^~` 前缀（优先于正则）。
+  2. `try_files $uri $uri/ =404` + `error_page 404 /目标.html`，若目标文件**不存在**会形成内部重定向环返回 **500**。
+- **Astro 站点约定**：404 必须用原生 `src/pages/404.astro`（固定输出 `/404.html`）；挂到 `[...slug]` 注册表会把键 `404` 变成 **number** 字面量污染 `PageSlug` 类型，且产不出页面。

@@ -30,6 +30,11 @@ futures-util = "0.3"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 # 链上中继（GeoTITRegistry JSON-RPC）；特性与 trip-cli 保持一致。
 reqwest = { workspace = true }
+# Unix socket 监听（`TRIP_LISTEN=unix:...`）：axum 0.7 的 `serve` 只吃 TcpListener，
+# 这一路需手动驱动 hyper 1.x；`tower` 仅为把 axum Router 当 Service 调用。
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+tower = "0.5"
 
 [dev-dependencies]
 rand = { workspace = true }

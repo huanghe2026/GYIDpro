@@ -1,0 +1,25 @@
+---
+/**
+ * 英文（默认语言）路由：`/`、`/protocol`、`/architecture`、`/docs/*`、`/console/*`、`/about`。
+ *
+ * 中文对应页在 `src/pages/zh/[...slug].astro`（同一套注册表，只换 locale）。
+ * 用注册表而非逐页文件，避免「新增页面忘加语言版本」这类漂移。
+ */
+import type { GetStaticPaths } from 'astro';
+import { pageRegistry, pageMeta, type PageSlug } from '../components/registry';
+import Layout from '../layouts/Layout.astro';
+import { ui } from '../i18n/ui';
+
+export const getStaticPaths = (() => {
+  return (Object.keys(pageRegistry) as PageSlug[]).map((slug) => ({ params: { slug: slug || undefined } }));
+}) satisfies GetStaticPaths;
+
+const slug = (Astro.params.slug ?? '') as PageSlug;
+const Page = pageRegistry[slug];
+const t = ui.en;
+const meta = pageMeta(slug, t);
+---
+
+<Layout slug={slug} title={meta.title} description={meta.description}>
+  <Page lang="en" />
+</Layout>

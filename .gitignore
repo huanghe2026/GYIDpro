@@ -6,6 +6,8 @@
 # Node / 前端
 node_modules/
 dist/
+# 子目录部署变体的构建产物（BASE_PATH=/verify/ OUT_DIR=./dist-verify）
+dist-verify/
 
 # IDE / Agent / 系统
 .trae/

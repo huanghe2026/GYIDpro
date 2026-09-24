@@ -1,0 +1,188 @@
+---
+import { ui, path, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const zh = lang === 'zh';
+const back = path(lang, 'docs');
+
+// 合成基线实测值（gyid calibrate synth --humans 150 --control 150 --window 256）
+const baseline = {
+  auc: '0.9761',
+  tpr: '0.9533',
+  fpr: '0.1244',
+  band: '[0.0119, 1.0881]',
+  humanMean: '0.5001',
+  humanMedian: '0.4936',
+  bioFraction: '55.3%',
+  controls: [
+    ['iid_levy', '-0.0141', '≈ 0'],
+    ['replay_drift', '1.6370', '≳ 1.2'],
+    ['correlated_gaussian', '2.0184', '≳ 1.0'],
+  ],
+  quantiles: [
+    ['P5', '0.0190'],
+    ['P25', '0.2791'],
+    ['Median', '0.4936'],
+    ['P75', '0.7216'],
+    ['P95', '1.0479'],
+  ],
+};
+
+const defects = zh
+  ? [
+      ['分析时间戳错误', 'utc_now_iso() 用 secs/31536000 当作「年」，写进报告元数据的日期是错的', '补 Howard Hinnant civil_from_days + iso8601_from_unix，并与既有 days_from_civil 做往返测试'],
+      ['NaN 导致整批中断', 'α/β 排序与 Youden 取极值共 3 处 partial_cmp(..).unwrap()，遇脏数据直接 panic', '统一 sorted_finite()：先剔除非有限值再比较'],
+      ['伪 ROC', '只用单个人类群体，把「低于阈值且高于 0.10 的比例」当假阳率，AUC 硬编码为 None', '改为真实双样本 ROC；无对照组时 roc = None，不伪造'],
+    ]
+  : [
+      ['Wrong analysis timestamp', 'utc_now_iso() treated secs/31536000 as a “year”, so the date written into report metadata was wrong', 'Added Howard Hinnant civil_from_days + iso8601_from_unix, with round-trip tests against the existing days_from_civil'],
+      ['One NaN aborted the batch', 'Three partial_cmp(..).unwrap() sites (α/β sorting, Youden argmax) panicked on dirty data', 'Unified into sorted_finite(): drop non-finite values before comparing'],
+      ['Pseudo ROC', 'Only the human population was used, defining FPR as “below threshold and above 0.10”; AUC was hardcoded to None', 'Replaced with a genuine two-sample ROC; without a control group roc = None rather than fabricated'],
+    ];
+---
+
+<div class="mx-auto max-w-4xl px-4 py-14">
+  <a href={back} class="font-mono text-xs text-cyber-blue hover:underline">← {t.docs.backToDocs}</a>
+  <h1 class="mt-4 text-3xl font-black tracking-tight text-white">{t.docs.cards[1].title}</h1>
+  <p class="mt-4 text-base leading-relaxed text-white/65">{t.docs.cards[1].desc}</p>
+
+  <div class="prose-gyid mt-10">
+    <h2>{zh ? '1. 为什么需要标定' : '1. Why calibration is needed'}</h2>
+    <p>
+      {
+        zh
+          ? '草案规定生物区间 α ∈ [0.30, 0.80]，但自己注明这个边界需要按人群校准，且点名单轨迹集成统计量的 ROC 与置信区间尚未验证。标定的目的不是「证明协议对」，而是把这些数字变成可被检验、可被反驳的证据。'
+          : 'The draft fixes the biological band at α ∈ [0.30, 0.80], but notes that the boundary needs population calibration and that the ROC and confidence intervals of single-trajectory aggregate statistics remain unvalidated. Calibration is not about proving the protocol right — it is about turning those numbers into evidence that can be inspected and contradicted.'
+      }
+    </p>
+
+    <h2>{zh ? '2. 先修正确性，再谈结论' : '2. Correctness first, conclusions second'}</h2>
+    <p>
+      {
+        zh
+          ? '标定管线里发现三处会产出错误结论的缺陷，在出任何数字之前先修掉：'
+          : 'Three defects in the calibration pipeline would have produced wrong conclusions, so they were fixed before any number was published:'
+      }
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>{zh ? '缺陷' : 'Defect'}</th><th>{zh ? '原状' : 'Before'}</th><th>{zh ? '现在' : 'After'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {defects.map((r) => (
+          <tr>{r.map((c) => <td>{c}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h2>{zh ? '3. 判别能力：真实 ROC' : '3. Discriminative power: a real ROC'}</h2>
+    <p>
+      {
+        zh
+          ? '评分函数取 score(α) = −|α − 0.55|：越接近粉噪中心越像人，白噪声与棕噪声两侧同时降分。负类为三族合成攻击轨迹：'
+          : 'The score is score(α) = −|α − 0.55|: the closer to the pink-noise centre the more human-like, penalising both the white-noise and brown-noise tails. The negative class is three synthetic attack families:'
+      }
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>{zh ? '族' : 'Family'}</th><th>{zh ? '生成器' : 'Generator'}</th><th>{zh ? '实测均值 α' : 'measured mean α'}</th><th>{zh ? '期望' : 'expected'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          baseline.controls.map((r, i) => (
+            <tr>
+              <td><code>{r[0]}</code></td>
+              <td>
+                {zh
+                  ? ['i.i.d. 截断 Levy 步进（草案 §7.3.3 字面生成器）', '重放同一录制序列 + 线性漂移', 'AR(1) 速度积分'][i]
+                  : ['i.i.d. truncated-Lévy steps (the §7.3.3 literal generator)', 'replayed recording plus linear drift', 'AR(1) velocity integration'][i]}
+              </td>
+              <td><code>{r[1]}</code></td>
+              <td>{r[2]}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+
+    <h3>{zh ? '合成基线（离线、可复现）' : 'Synthetic baseline (offline, reproducible)'}</h3>
+    <pre><code>gyid calibrate synth --humans 150 --control 150 --window 256</code></pre>
+    <table>
+      <tbody>
+        <tr><td>AUC</td><td><strong>{baseline.auc}</strong></td></tr>
+        <tr><td>{zh ? '最优点 TPR / FPR' : 'optimal TPR / FPR'}</td><td>{baseline.tpr} / {baseline.fpr}</td></tr>
+        <tr><td>{zh ? '等价的 α 判决区间' : 'equivalent α decision band'}</td><td><code>{baseline.band}</code></td></tr>
+        <tr><td>{zh ? '人类组 α 均值 / 中位' : 'human α mean / median'}</td><td>{baseline.humanMean} / {baseline.humanMedian}</td></tr>
+        <tr><td>{zh ? '生物区间覆盖率' : 'biological-band coverage'}</td><td>{baseline.bioFraction}</td></tr>
+      </tbody>
+    </table>
+
+    <h3>{zh ? '人类组 α 分位（合成基线）' : 'Human α quantiles (synthetic baseline)'}</h3>
+    <table>
+      <tbody>
+        {
+          baseline.quantiles.map((r) => (
+            <tr><td>{r[0]}</td><td><code>{r[1]}</code></td></tr>
+          ))
+        }
+      </tbody>
+    </table>
+
+    <h2>{zh ? '4. 这些数字能支撑什么，不能支撑什么' : '4. What these numbers do and do not support'}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>{zh ? '结论' : 'Claim'}</th><th>{zh ? '是否成立' : 'Supported'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{zh ? '经典引擎的 α 能把「结构化 Levy 轨迹」与三族合成攻击区分开' : 'α separates structured-Lévy trajectories from the three synthetic attack families'}</td>
+          <td>{zh ? '成立（合成基线 AUC 0.98）' : 'Yes (AUC 0.98 on the synthetic baseline)'}</td>
+        </tr>
+        <tr>
+          <td>{zh ? 'α 能区分真实人类与自适应对手' : 'α separates real humans from adaptive adversaries'}</td>
+          <td>{zh ? '不成立——需真实 GeoLife 数据与 TRIP-Arena 攻击迭代' : 'No — requires real GeoLife data and iteration in the TRIP-Arena'}</td>
+        </tr>
+        <tr>
+          <td>{zh ? '协议生物区间 [0.30, 0.80] 适用于中国城市人群' : 'The draft band [0.30, 0.80] fits the Chinese urban population'}</td>
+          <td>{zh ? '待定——需下载 GeoLife 后运行 geolife 子命令' : 'Open — run the geolife subcommand after downloading the dataset'}</td>
+        </tr>
+        <tr>
+          <td>{zh ? '单一统计量足以做高风险判定' : 'One statistic is enough for high-stakes decisions'}</td>
+          <td>{zh ? '不成立——必须与六分量 Hamiltonian 并用' : 'No — must be combined with the six-component Hamiltonian'}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>{zh ? '5. 怎么复现' : '5. How to reproduce'}</h2>
+    <pre><code>{zh
+      ? `# 全离线（无需下载任何数据）\ngyid calibrate synth --humans 150 --control 150 --window 256 --output /tmp/synth.json\ngyid calibrate whitepaper --input /tmp/synth.json --output /tmp/synth.md\n\n# 真实数据集\ntools/calibration/download_geolife.sh\ntools/calibration/prepare_dataset.sh --root "tools/calibration/data/GeoLife Trajectories 1.3"\ngyid calibrate geolife --data-dir "tools/calibration/data/GeoLife Trajectories 1.3" --control 200 --output /tmp/geolife.json`
+      : `# Fully offline (no download required)\ngyid calibrate synth --humans 150 --control 150 --window 256 --output /tmp/synth.json\ngyid calibrate whitepaper --input /tmp/synth.json --output /tmp/synth.md\n\n# Real dataset\ntools/calibration/download_geolife.sh\ntools/calibration/prepare_dataset.sh --root "tools/calibration/data/GeoLife Trajectories 1.3"\ngyid calibrate geolife --data-dir "tools/calibration/data/GeoLife Trajectories 1.3" --control 200 --output /tmp/geolife.json`}</code></pre>
+    <p>
+      {
+        zh
+          ? '回归基线固化在 trip-core/tests/calibration_golden.rs 与 tests/vectors/calibration-vectors.json；重新生成需显式设置 UPDATE_CALIBRATION_VECTORS=1。'
+          : 'The regression baseline lives in trip-core/tests/calibration_golden.rs and tests/vectors/calibration-vectors.json; regenerating it requires explicitly setting UPDATE_CALIBRATION_VECTORS=1.'
+      }
+    </p>
+
+    <h2>{zh ? '6. 后续工作' : '6. Future work'}</h2>
+    <ul>
+      <li>{zh ? '接入 MDC（洛桑）做跨人群对照' : 'Add MDC (Lausanne) for a cross-population comparison'}</li>
+      <li>{zh ? '接入 T-Drive 作为职业偏差参照' : 'Add T-Drive as an occupational-bias reference'}</li>
+      <li>{zh ? '按出行模式分层（通勤 vs 游客）' : 'Stratify by mobility pattern (commuter vs. tourist)'}</li>
+      <li>{zh ? 'AUC 与 α 分位的自助法置信区间' : 'Bootstrap confidence intervals for AUC and α quantiles'}</li>
+      <li>{zh ? '季节性漂移监控' : 'Temporal drift monitoring for seasonal effects'}</li>
+    </ul>
+  </div>
+</div>

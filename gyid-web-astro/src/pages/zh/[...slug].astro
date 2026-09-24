@@ -1,0 +1,23 @@
+---
+/**
+ * 中文路由：`/zh/`、`/zh/protocol`、`/zh/console/*` …
+ * 与英文共用 `src/components/registry.ts` 的注册表。
+ */
+import type { GetStaticPaths } from 'astro';
+import { pageRegistry, pageMeta, type PageSlug } from '../../components/registry';
+import Layout from '../../layouts/Layout.astro';
+import { ui } from '../../i18n/ui';
+
+export const getStaticPaths = (() => {
+  return (Object.keys(pageRegistry) as PageSlug[]).map((slug) => ({ params: { slug: slug || undefined } }));
+}) satisfies GetStaticPaths;
+
+const slug = (Astro.params.slug ?? '') as PageSlug;
+const Page = pageRegistry[slug];
+const t = ui.zh;
+const meta = pageMeta(slug, t);
+---
+
+<Layout slug={slug} title={meta.title} description={meta.description}>
+  <Page lang="zh" />
+</Layout>

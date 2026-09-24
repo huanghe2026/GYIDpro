@@ -1,0 +1,75 @@
+---
+import { ui, consoleTabs, path, type Lang } from '../i18n/ui';
+import Eyebrow from './ui/Eyebrow.astro';
+
+interface Props {
+  lang: Lang;
+  slug: string;
+  heading?: string;
+}
+
+const { lang, slug, heading } = Astro.props;
+const t = ui[lang];
+const tabs = consoleTabs(t);
+const current = slug === 'console' ? 'console' : slug;
+---
+
+<div class="mx-auto max-w-6xl px-4 pt-12 pb-6">
+  <Eyebrow>{t.console.title}</Eyebrow>
+  <h1 class="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
+    {heading ?? t.console.title}
+  </h1>
+  <p class="mt-3 max-w-3xl text-sm leading-relaxed text-white/60">{t.console.lead}</p>
+</div>
+
+<!-- 身份状态条（由 console-ui.ts 填充） -->
+<div class="mx-auto max-w-6xl px-4">
+  <div id="gyid-identity-bar" class="cyber-border p-4" data-lang={lang}>
+    <div class="text-sm text-white/45">loading…</div>
+  </div>
+</div>
+
+<!-- 页签 -->
+<div class="mx-auto max-w-6xl px-4 pt-6">
+  <nav class="nav-scroll flex gap-1 overflow-x-auto border-b border-white/[0.08] pb-px">
+    {
+      tabs.map((tab) => (
+        <a
+          href={path(lang, tab.slug)}
+          class:list={[
+            'whitespace-nowrap rounded-t-lg px-4 py-2.5 text-sm font-bold transition',
+            current === tab.slug
+              ? 'border border-b-0 border-white/[0.08] bg-white/[0.04] text-cyber-blue'
+              : 'text-white/55 hover:text-white',
+          ]}
+          aria-current={current === tab.slug ? 'page' : undefined}
+        >
+          {tab.label}
+        </a>
+      ))
+    }
+  </nav>
+</div>
+
+<div class="mx-auto max-w-6xl px-4 py-8">
+  <slot />
+</div>
+
+<div class="mx-auto max-w-6xl px-4 pb-16">
+  <p class="rounded-xl border border-cyber-yellow/25 bg-cyber-yellow/[0.06] p-4 text-xs leading-relaxed text-white/55">
+    {t.console.disclaimer}
+  </p>
+</div>
+
+<script>
+  import { mountIdentityBar } from '../lib/console-ui';
+
+  // View Transitions 每次换页都会触发 astro:page-load；此处重新挂载身份条
+  // （DOM 已换成新节点，旧的监听器随之失去引用）。
+  document.addEventListener('astro:page-load', () => {
+    const bar = document.getElementById('gyid-identity-bar');
+    if (!bar) return;
+    const lang = bar.getAttribute('data-lang') === 'zh' ? 'zh' : 'en';
+    mountIdentityBar(lang);
+  });
+</script>

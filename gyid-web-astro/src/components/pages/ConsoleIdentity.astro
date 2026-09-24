@@ -1,0 +1,165 @@
+---
+import ConsoleShell from '../ConsoleShell.astro';
+import { ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const isZh = lang === 'zh';
+
+const L = {
+  accounts: isZh ? '本地账户' : 'Local accounts',
+  empty: isZh ? '暂无账户，点击上方「+ 新建身份」开始。' : 'No accounts yet — use “+ New identity” above.',
+  pubkey: isZh ? 'Attester 公钥（pubkey hex）' : 'Attester public key (hex)',
+  verifierState: isZh ? '验证方链状态' : 'Verifier chain state',
+  refresh: isZh ? '刷新' : 'Refresh',
+  noEvidence: isZh
+    ? '该身份在验证方处还没有证据——先到 Collect 页采集并上传。'
+    : 'No evidence for this identity yet — collect and upload on the Collect tab.',
+  breadcrumbs: isZh ? '面包屑' : 'breadcrumbs',
+  uniqueCells: isZh ? '唯一 H5 网格' : 'unique cells',
+  chainHead: isZh ? '链头' : 'chain head',
+  lastTs: isZh ? '最后时间' : 'last seen',
+  delete: isZh ? '删除' : 'Delete',
+  created: isZh ? '创建于' : 'created',
+};
+---
+
+<ConsoleShell lang={lang} slug="console" heading={t.console.tabs.identity}>
+  <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+    <div class="cyber-border p-5">
+      <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.accounts}</h2>
+      <div id="gyid-account-list" class="mt-4 space-y-2 text-sm text-white/50">{L.empty}</div>
+    </div>
+
+    <div class="cyber-border p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-cyber-blue">{L.verifierState}</h2>
+        <button
+          id="gyid-refresh-state"
+          class="rounded-lg border border-white/12 px-3 py-1.5 text-xs font-bold text-white/70 transition hover:border-cyber-blue/40 hover:text-cyber-blue"
+          >{L.refresh}</button
+        >
+      </div>
+      <div id="gyid-pubkey-block" class="mt-4 hidden">
+        <p class="text-xs text-white/45">{L.pubkey}</p>
+        <code id="gyid-pubkey" class="mt-1 block break-all font-mono text-xs text-cyber-cyan"></code>
+      </div>
+      <div id="gyid-verifier-state" class="mt-4 text-sm text-white/50">
+        {L.noEvidence}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { getState, onSession } from '../../lib/console-ui';
+    import { fetchIdentity } from '../../lib/verifier';
+
+    interface Labels {
+      breadcrumbs: string;
+      uniqueCells: string;
+      chainHead: string;
+      lastTs: string;
+      noEvidence: string;
+    }
+
+    async function renderVerifierState(pubkey: string | null, L: Labels): Promise<void> {
+      const host = document.getElementById('gyid-verifier-state');
+      const pkBlock = document.getElementById('gyid-pubkey-block');
+      const pkEl = document.getElementById('gyid-pubkey');
+      if (!host) return;
+
+      if (!pubkey) {
+        host.textContent = L.noEvidence;
+        pkBlock?.classList.add('hidden');
+        return;
+      }
+      pkBlock?.classList.remove('hidden');
+      if (pkEl) pkEl.textContent = pubkey;
+
+      host.textContent = '…';
+      try {
+        const info = await fetchIdentity(pubkey);
+        if (!info) {
+          host.textContent = L.noEvidence;
+          return;
+        }
+        const when = new Date(info.last_ts * 1000).toLocaleString();
+        host.innerHTML = `
+          <div class="grid grid-cols-2 gap-3">
+            <div><div class="text-xs text-white/40">${L.breadcrumbs}</div><div class="font-cyber text-lg font-black text-cyber-blue">${info.breadcrumb_count}</div></div>
+            <div><div class="text-xs text-white/40">${L.uniqueCells}</div><div class="font-cyber text-lg font-black text-cyber-purple">${info.unique_cells}</div></div>
+          </div>
+          <div class="mt-3"><div class="text-xs text-white/40">${L.chainHead}</div><code class="break-all font-mono text-[11px] text-cyber-cyan">${info.chain_head}</code></div>
+          <div class="mt-2"><div class="text-xs text-white/40">${L.lastTs}</div><div class="font-mono text-xs text-white/60">${when}</div></div>
+        `;
+      } catch (e) {
+        host.textContent = e instanceof Error ? e.message : String(e);
+      }
+    }
+
+    function init(): void {
+      const bar = document.getElementById('gyid-identity-bar');
+      if (!bar) return;
+      const raw = bar.getAttribute('data-lang') ?? 'en';
+      const zh = raw === 'zh';
+      const L: Labels = {
+        breadcrumbs: zh ? '面包屑' : 'breadcrumbs',
+        uniqueCells: zh ? '唯一网格' : 'unique cells',
+        chainHead: zh ? '链头' : 'chain head',
+        lastTs: zh ? '最后时间' : 'last seen',
+        noEvidence: zh
+          ? '该身份在验证方处还没有证据——先到 Collect 页采集并上传。'
+          : 'No evidence for this identity yet — collect and upload on the Collect tab.',
+      };
+
+      const L2 = {
+        empty: zh ? '暂无账户，点击上方「+ 新建身份」开始。' : 'No accounts yet — use “+ New identity” above.',
+        created: zh ? '创建于' : 'created',
+      };
+
+      const list = document.getElementById('gyid-account-list');
+      const renderList = (): void => {
+        if (!list) return;
+        const st = getState();
+        if (st.accounts.length === 0) {
+          list.innerHTML = `<p class="text-sm text-white/45">${L2.empty}</p>`;
+          return;
+        }
+        list.innerHTML = st.accounts
+          .map((a) => {
+            const active = a.id === st.activeId;
+            return `<div class="flex items-center gap-3 rounded-lg border border-white/[0.07] px-3 py-2.5">
+              <span class="h-2 w-2 rounded-full ${active ? 'bg-cyber-blue' : 'bg-white/20'}"></span>
+              <span class="font-bold text-white">${a.label}</span>
+              <span class="flex-1"></span>
+              <span class="font-mono text-[11px] text-white/40">${new Date(a.createdAt).toLocaleDateString()}</span>
+            </div>`;
+          })
+          .join('');
+      };
+
+      const refresh = (): void => {
+        renderList();
+        void renderVerifierState(getState().session?.pubkeyHex ?? null, L);
+      };
+
+      document.getElementById('gyid-refresh-state')?.addEventListener('click', refresh);
+
+      onSession((session) => {
+        void renderVerifierState(session?.pubkeyHex ?? null, L);
+      });
+      renderList();
+      void renderVerifierState(getState().session?.pubkeyHex ?? null, L);
+
+      // 账户切换/新建后列表也要刷新
+      const mo = new MutationObserver(() => renderList());
+      mo.observe(bar, { childList: true, subtree: true });
+    }
+
+    document.addEventListener('astro:page-load', init);
+  </script>
+</ConsoleShell>
