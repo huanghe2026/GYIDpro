@@ -9,11 +9,13 @@
 //! 运行 `gyid --help` 查看完整命令列表。
 
 mod anchor_cmds;
+mod calibrate_cmds;
 
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
 use anchor_cmds::AnchorCmd;
+use calibrate_cmds::CalibrateCmd;
 use clap::{Parser, Subcommand};
 use trip_core::breadcrumb::{Breadcrumb, MetaFlags};
 use trip_core::chain::ChainRules;
@@ -121,6 +123,11 @@ enum Cmd {
     Anchor {
         #[command(subcommand)]
         action: AnchorCmd,
+    },
+    /// (advanced) 人群标定与判别能力报告（W7：GeoLife / 合成对照 + ROC）
+    Calibrate {
+        #[command(subcommand)]
+        action: CalibrateCmd,
     },
     /// (advanced) 端到端仿真
     Simulate {
@@ -405,6 +412,7 @@ async fn main() {
             } => cmd_tit_verify(&tit, verifier_pubkey.as_deref(), now),
         },
         Cmd::Anchor { action } => anchor_cmds::dispatch(action).await,
+        Cmd::Calibrate { action } => calibrate_cmds::dispatch(action),
         Cmd::Simulate { seed, count } => cmd_simulate(seed, count),
     }
 }
