@@ -1,0 +1,7 @@
+# GeoLife 原始数据（约 1.9 GB 压缩包 + 解压后数 GB）——绝不入库
+data/
+*.zip
+
+# 标定产物（报告 / 白皮书草稿在 docs/ 下单独管理）
+*.json
+!*.example.json

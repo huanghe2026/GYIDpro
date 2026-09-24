@@ -14,3 +14,9 @@ dist/
 *.swp
 *.swo
 .DS_Store
+
+# 浏览器端到端取证（playwright-cli）
+.playwright-cli/
+
+# W7 标定原始数据集（体积大，见 tools/calibration/.gitignore）
+tools/calibration/data/

@@ -5,3 +5,4 @@ broadcast/
 # 测试合约的构建产物不入库；主合约 artifact 入库，
 # 便于 Rust CLI（chain deploy/anchor）在没有 node 的环境直接使用。
 artifacts/GeoTITRegistryTest.json
+.env
