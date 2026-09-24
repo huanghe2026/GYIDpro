@@ -34,10 +34,7 @@ pub async fn overview(State(state): State<AppState>) -> ServerResult<impl IntoRe
     let evidence = state.inner.evidence.read().await.clone();
     let poh_counts: std::collections::HashMap<[u8; 32], usize> = {
         let attester_pohs = state.inner.attester_pohs.read().await;
-        attester_pohs
-            .iter()
-            .map(|(k, v)| (*k, v.len()))
-            .collect()
+        attester_pohs.iter().map(|(k, v)| (*k, v.len())).collect()
     };
 
     let mut identities: Vec<serde_json::Value> = Vec::with_capacity(evidence.len());

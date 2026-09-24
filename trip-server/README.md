@@ -35,8 +35,32 @@ cargo run --release -p trip-server
 | `TRIP_MIN_TRUST` | `20.0` | RP 策略最小信任分 |
 | `TRIP_CORS_ORIGINS` | `*` | 允许的 Origin，逗号分隔（`*` 仅开发环境） |
 | `TRIP_PUBLIC_URL` | `http://127.0.0.1:8080` | 对外 base URL，写入 DID Document 的 `#verifier` / `#tit` 端点 |
-| `TRIP_ANCHOR` | （空） | EVM 锚定指针，CAIP-2 `eip155:<chain_id>:<registry>`，写入 `#anchor` |
+| `TRIP_ANCHOR` | （空） | EVM 锚定指针，CAIP-2 `eip155:<chain_id>:<registry>`，写入 `#anchor`；与 `EVM_PRIVATE_KEY` 同时设置时启用链上中继 |
+| `EVM_PRIVATE_KEY` | （空） | GeoTITRegistry **付费**密钥（secp256k1，hex，可带 `0x`），与 `TRIP_VERIFIER_SEED`（Ed25519 身份密钥）相互独立；其地址必须是合约的 verifier |
+| `TRIP_EVM_RPC_URL` | 按 chain id 选 Base 官方 RPC | GeoTITRegistry JSON-RPC 端点（84532 → sepolia.base.org，8453 → mainnet.base.org） |
+| `TRIP_EPOCH_SIZE` | `100` | 每个链上 epoch 覆盖的面包屑数；凑满即自动 `anchorEpoch` |
 | `RUST_LOG` | `info,tower_http=warn` | 日志过滤 |
+
+### 链上中继（可选，缺省关闭）
+
+设置 `TRIP_ANCHOR` + `EVM_PRIVATE_KEY` 后，Verifier 在后台 actor 中代付 gas 写
+GeoTITRegistry（任何链上失败只记 WARN，不影响验证流程）：
+
+- **首次主动验证成功**（PoH 落库）→ 自动 `register(pubkey, multibase 后缀)`，写前查 `identityOf`，幂等；
+- **证据链落库后** → 每凑满 `TRIP_EPOCH_SIZE` 条连续面包屑，自动
+  `anchorEpoch(pubkey, epoch_no, merkle_root, unique_cells)`，epoch 序号按链上
+  `epochCount` 严格连续推进，进程重启不重放；
+- 链上**只锚存在性**（DID 后缀 / SHA-256 Merkle 根 / 唯一网格数），
+  不写坐标、cell、照片；`claimHandle` 暂不自动触发（需 n≥100 且 T≥20，用
+  `gyid anchor handle` 手动声明）。
+
+本地联调示例（Base Sepolia）：
+
+```bash
+TRIP_ANCHOR=eip155:84532:0x<GeoTITRegistry 地址> \
+EVM_PRIVATE_KEY=0x<verifier secp256k1 私钥> \
+cargo run -p trip-server
+```
 
 ## 三方验证流程
 

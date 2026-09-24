@@ -87,6 +87,10 @@ pub async fn upload(State(state): State<AppState>, body: Bytes) -> ServerResult<
         .len();
     let chain_head = merged.last().expect("non-empty after verify").block_hash();
 
+    // 链上中继（启用时）：按链上 epochCount 补齐已满的 epoch；失败仅记日志，
+    // 不影响证据上传的成功响应。
+    state.on_evidence_accepted(identity, &merged);
+
     state.inner.evidence.write().await.insert(identity, merged);
 
     Ok(Json(json!({

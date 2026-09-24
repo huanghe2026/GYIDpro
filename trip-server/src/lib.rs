@@ -14,6 +14,7 @@
 //! MVP 为单进程内存存储（无 Postgres/Redis），引擎直接复用
 //! [`trip_core`]；CPU 密集计算一律 `spawn_blocking`。
 
+pub mod chain;
 pub mod config;
 pub mod engine_bridge;
 pub mod error;

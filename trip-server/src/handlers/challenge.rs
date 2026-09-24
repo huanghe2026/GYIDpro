@@ -230,5 +230,8 @@ async fn verify_and_issue(
             .push(response.challenge_id);
     }
 
+    // 链上中继（启用时）：首次主动验证成功后登记身份（幂等，actor 先查链）。
+    state.on_identity_verified(attester);
+
     Ok((response.challenge_id, eval, policy_ok))
 }

@@ -15,7 +15,7 @@ name = "trip-server"
 path = "src/main.rs"
 
 [dependencies]
-trip-core = { path = "../trip-core" }
+trip-core = { path = "../trip-core", features = ["anchor"] }
 axum = { version = "0.7", features = ["ws", "macros"] }
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -28,6 +28,8 @@ hex = { workspace = true }
 uuid = { workspace = true }
 futures-util = "0.3"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
+# 链上中继（GeoTITRegistry JSON-RPC）；特性与 trip-cli 保持一致。
+reqwest = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }

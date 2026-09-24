@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use trip_core::{Breadcrumb, ProtocolKey};
 
+use crate::chain::ChainRelay;
 use crate::config::Config;
 
 /// 挑战生命周期状态。
@@ -59,6 +60,8 @@ pub struct Shared {
     pub poh: RwLock<HashMap<[u8; 16], Vec<u8>>>,
     pub attester_pohs: RwLock<HashMap<[u8; 32], Vec<[u8; 16]>>>,
     pub ws_senders: RwLock<HashMap<[u8; 32], mpsc::UnboundedSender<OutMsg>>>,
+    /// 可选链上中继（GeoTITRegistry）；未配置时为 None，handler 零开销跳过。
+    pub relay: Option<ChainRelay>,
 }
 
 /// 应用状态句柄（廉价 clone）。
@@ -68,8 +71,17 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// 用显式 Verifier 密钥与配置构造（测试 / main 共用）。
+    /// 用显式 Verifier 密钥与配置构造（测试 / main 共用），不启用链上中继。
     pub fn new(verifier_key: ProtocolKey, config: Config) -> Self {
+        Self::new_with_relay(verifier_key, config, None)
+    }
+
+    /// 构造并注入链上中继（main 在 TRIP_ANCHOR + EVM_PRIVATE_KEY 齐备时使用）。
+    pub fn new_with_relay(
+        verifier_key: ProtocolKey,
+        config: Config,
+        relay: Option<ChainRelay>,
+    ) -> Self {
         Self {
             inner: Arc::new(Shared {
                 verifier_key: Arc::new(verifier_key),
@@ -79,6 +91,7 @@ impl AppState {
                 poh: RwLock::new(HashMap::new()),
                 attester_pohs: RwLock::new(HashMap::new()),
                 ws_senders: RwLock::new(HashMap::new()),
+                relay,
             }),
         }
     }
@@ -90,6 +103,20 @@ impl AppState {
             tx.send(msg).is_ok()
         } else {
             false
+        }
+    }
+
+    /// PoH 签发后通知中继做身份登记（未启用中继时 no-op）。
+    pub fn on_identity_verified(&self, pubkey: &[u8; 32]) {
+        if let Some(relay) = &self.inner.relay {
+            relay.identity_verified(*pubkey);
+        }
+    }
+
+    /// 证据链落库后通知中继补齐 epoch 锚定（未启用中继时 no-op）。
+    pub fn on_evidence_accepted(&self, pubkey: [u8; 32], chain: &[Breadcrumb]) {
+        if let Some(relay) = &self.inner.relay {
+            relay.evidence_accepted(pubkey, chain.to_vec());
         }
     }
 }

@@ -30,6 +30,11 @@ pub struct Config {
     pub public_url: String,
     /// EVM 链上锚定指针（写入 DID Document 的 `#anchor`）。
     pub anchor: Option<AnchorReference>,
+    /// GeoTITRegistry 只读/广播 RPC 端点（`TRIP_EVM_RPC_URL`）。
+    /// 缺省时按 chain id 选 Base 官方公共 RPC。
+    pub evm_rpc_url: Option<String>,
+    /// 每个链上 epoch 覆盖的面包屑数（`TRIP_EPOCH_SIZE`，默认 100）。
+    pub epoch_size: usize,
 }
 
 impl Default for Config {
@@ -43,6 +48,8 @@ impl Default for Config {
             cors_origins: vec!["*".to_string()],
             public_url: "http://127.0.0.1:8080".to_string(),
             anchor: None,
+            evm_rpc_url: None,
+            epoch_size: 100,
         }
     }
 }
@@ -99,6 +106,21 @@ impl Config {
                 None => tracing::warn!(
                     value = %v,
                     "TRIP_ANCHOR must be CAIP-2 eip155:<chain_id>:<registry>; ignored"
+                ),
+            }
+        }
+        if let Ok(v) = env::var("TRIP_EVM_RPC_URL") {
+            let trimmed = v.trim().trim_end_matches('/').to_string();
+            if !trimmed.is_empty() {
+                cfg.evm_rpc_url = Some(trimmed);
+            }
+        }
+        if let Ok(v) = env::var("TRIP_EPOCH_SIZE") {
+            match v.parse::<usize>() {
+                Ok(n) if n > 0 => cfg.epoch_size = n,
+                _ => tracing::warn!(
+                    value = %v,
+                    "TRIP_EPOCH_SIZE must be a positive integer; using default 100"
                 ),
             }
         }
